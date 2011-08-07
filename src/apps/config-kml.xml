@@ -1,0 +1,34 @@
+<?xml version="1.0" ?>
+<configuration>
+
+    <title>Showing KML support</title>
+    <style>
+        <!-- Black Gold -->
+        <colors>0xFFFFFF,0x333333,0x101010,0x000000,0xFFD700</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <widget left="10"  top="50"    config="widgets/Navigation/NavigationWidget.xml" url="widgets/Navigation/NavigationWidget.swf"/>
+    <widget right="-2" bottom="-2" config="widgets/OverviewMap/OverviewMapWidget.xml" url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+    <widget right="20" top="55"    config="widgets/MapSwitcher/MapSwitcherWidget.xml" url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0" top="0" config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map level="2" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+        </basemaps>
+        <operationallayers>
+            <layer label="Western US Railroads" type="kml" visible="false"
+                   url="http://geocommons.com/overlays/119539.kml"/>
+            <layer label="World copper smelters" type="kml" visible="true"
+                   url="http://explore.data.gov/download/db3a-9tgn/KML"/>
+            <layer label="Formula 1" type="kml" visible="false"
+                   url="http://gis.ibbeck.de/OLClient/data/Wikipedia/Formel-1-Rennstrecken%20%2854%29.kml"/>
+            <layer label="Wildlife National Parks India" type="kml" visible="true"
+                   url="http://world.wildlife.adventures.googlepages.com/wildlife-national-parks-india.kml"/>
+            <layer label="Tour de Palm Springs" type="kml" visible="false"
+                   url="http://help.arcgis.com/en/webapps/flexviewer/tourdepalmsprings.kml"/>
+        </operationallayers>
+    </map>
+</configuration>

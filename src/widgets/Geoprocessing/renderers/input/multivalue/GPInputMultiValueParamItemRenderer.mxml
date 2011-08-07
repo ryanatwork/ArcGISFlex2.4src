@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+                xmlns:s="library://ns.adobe.com/flex/spark"
+                xmlns:mx="library://ns.adobe.com/flex/mx"
+                autoDrawBackground="false">
+    <fx:Script>
+        <![CDATA[
+            import mx.collections.ArrayList;
+
+            import widgets.Geoprocessing.parameters.MultiValueItem;
+
+            [Bindable]
+            private var multiValueItemsList:ArrayList;
+
+            override public function set data(value:Object):void
+            {
+                super.data = value;
+
+                if (data)
+                {
+                    selectDefaultValuesFromChoiceList(data.choiceList, data.defaultValue as Array);
+                    multiValueItemsList = new ArrayList(data.choiceList);
+                }
+            }
+
+            private function selectDefaultValuesFromChoiceList(choiceList:Array, defaultValues:Array):void
+            {
+                var selectedDefaultValueMap:Dictionary = createSelectedDefaultValuesMap(defaultValues);
+
+                for each (var multiValueItem:MultiValueItem in choiceList)
+                {
+                    if (selectedDefaultValueMap[multiValueItem.item])
+                    {
+                        multiValueItem.selected = true;
+                    }
+                }
+            }
+
+            private function createSelectedDefaultValuesMap(defaultValues:Array):Dictionary
+            {
+                var selectedDefaultValueMap:Dictionary = new Dictionary(true);
+                for each (var defaultValue:String in defaultValues)
+                {
+                    selectedDefaultValueMap[defaultValue] = true;
+                }
+
+                return selectedDefaultValueMap;
+            }
+        ]]>
+    </fx:Script>
+    <mx:FormItem width="100%"
+                 label="{data.label}"
+                 required="{data.required}">
+        <s:DataGroup dataProvider="{multiValueItemsList}" itemRenderer="widgets.Geoprocessing.renderers.input.multivalue.MultiValueItemRenderer">
+            <s:layout>
+                <s:VerticalLayout gap="2"/>
+            </s:layout>
+        </s:DataGroup>
+    </mx:FormItem>
+</s:ItemRenderer>

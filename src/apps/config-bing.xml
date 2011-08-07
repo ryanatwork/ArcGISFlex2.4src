@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<configuration>
+
+    <title>Bing Maps and Bing locator</title>
+    <style>
+        <!-- Black Gold -->
+        <colors>0xFFFFFF,0x333333,0x101010,0x000000,0xFFD700</colors>
+    </style>
+    <!-- replace the following url with your own geometryservice -->
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+    <!-- replace the following key with your own Bing key -->
+    <bing key="Ahw1due6dkmZg98wUJJYLrVmYlDik4oleCg6hoNqx6l2jFYRToImQH1HfH-asjjH"/>
+
+    <widget left="10"  top="50"    config="widgets/Navigation/NavigationWidget.xml" url="widgets/Navigation/NavigationWidget.swf"/>
+    <widget right="-2" bottom="-2" config="widgets/OverviewMap/OverviewMapWidget.xml" url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+    <widget right="20" top="55"    config="widgets/MapSwitcher/MapSwitcherWidget.xml" url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0"   top="0"     config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-2757000 -5006000 18493000 12369000" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="bing" visible="false" style="road" culture="en-US" />
+            <layer label="Aerial" type="bing" visible="true" style="aerial" culture="en-US" />
+            <layer label="Aerial with labels" type="bing" visible="false" style="aerialWithLabels" culture="en-US" />
+        </basemaps>
+        <operationallayers>
+        </operationallayers>
+    </map>
+    <widgetcontainer layout="float">
+            <widget label="Find places with Bing" left="80" top="80"
+                    config="widgets/Locate/LocateWidget_Bing.xml"
+                    icon="assets/images/i_target.png"
+                    preload="open"
+                    url="widgets/Locate/LocateWidget.swf"/>
+    </widgetcontainer>
+</configuration>

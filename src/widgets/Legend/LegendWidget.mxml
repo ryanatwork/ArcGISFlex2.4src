@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2010-2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009"
+                   xmlns:s="library://ns.adobe.com/flex/spark"
+                   xmlns:mx="library://ns.adobe.com/flex/mx"
+                   xmlns:esri="http://www.esri.com/2008/ags"
+                   xmlns:viewer="com.esri.viewer.*"
+                   widgetConfigLoaded="basewidget_widgetConfigLoaded(event)">
+
+    <fx:Script>
+        <![CDATA[
+            import com.esri.ags.events.MapEvent;
+            import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+            import com.esri.ags.layers.ArcGISTiledMapServiceLayer;
+            import com.esri.ags.layers.FeatureLayer;
+            import com.esri.ags.layers.GraphicsLayer;
+            import com.esri.ags.layers.Layer;
+            import com.esri.viewer.AppEvent;
+            import com.esri.viewer.ViewerContainer;
+
+            import mx.collections.ArrayCollection;
+            import mx.utils.ObjectUtil;
+
+            private var arrOperationalLayers:Array;
+            private var arrBaseMapLayers:Array;
+            private var mapLayers:Array;
+            private var legendLayers:Array;
+            private var excludeLayers:Array;
+
+            private var useBaseMaps:Boolean;
+            private var useOperationalLayers:Boolean = true;
+
+            [Bindable]
+            private var respectCurrentMapScale:Boolean = true;
+
+            private function basewidget_widgetConfigLoaded(event:Event):void
+            {
+                if (configXML)
+                {
+                    // respectcurrentmapscale
+                    if (configXML.respectcurrentmapscale.length() > 0)
+                    {
+                        respectCurrentMapScale = configXML.respectcurrentmapscale == "true";
+                    }
+
+                    //usebasemaps
+                    if (configXML.usebasemaps.length() > 0)
+                    {
+                        useBaseMaps = configXML.usebasemaps == "true";
+                    }
+
+                    //useoperationallayers
+                    if (configXML.useoperationallayers.length() > 0)
+                    {
+                        useOperationalLayers = configXML.useoperationallayers == "true";
+                    }
+
+                    //excludeLayers
+                    excludeLayers = [];
+                    var layers:XMLList = configXML.excludelayer as XMLList;
+                    for (var n:Number = 0; n < layers.length(); n++)
+                    {
+                        excludeLayers.push(layers[n].toString());
+                    }
+                }
+                AppEvent.dispatch(AppEvent.DATA_OPT_LAYERS, null, getOplayers);
+                map.addEventListener(MapEvent.LAYER_ADD, mapLayerAddHandler, false, 1);
+                map.addEventListener(MapEvent.LAYER_REMOVE, mapLayerRemoveHandler, false, 1);
+            }
+
+            private function getOplayers(event:AppEvent):void
+            {
+                arrOperationalLayers = event.data as Array;
+                getLayers(arrOperationalLayers);
+            }
+
+            private function mapLayerAddHandler(event:MapEvent):void
+            {
+                if (useOperationalLayers)
+                {
+                    if (event.layer is FeatureLayer || event.layer is ArcGISDynamicMapServiceLayer || event.layer is ArcGISTiledMapServiceLayer)
+                    {
+                        arrOperationalLayers.push({ layer: event.layer });
+                        getLayers(arrOperationalLayers);
+                    }
+                }
+            }
+
+            private function mapLayerRemoveHandler(event:MapEvent):void
+            {
+                var newLegendLayers:Array = [];
+                for (var i:Number = 0; i < legendLayers.length; i++)
+                {
+                    if (legendLayers[i] !== event.layer)
+                    {
+                        newLegendLayers.push(legendLayers[i]);
+                    }
+                }
+                if (newLegendLayers.length != legendLayers.length)
+                {
+                    legendLayers = newLegendLayers;
+                    myLegend.layers = legendLayers;
+                }
+            }
+
+            private function getLayers(array:Array):void
+            {
+                if (useOperationalLayers && !useBaseMaps) // only use operational layers
+                {
+                    populateLegend(array.reverse());
+                }
+                else if (useBaseMaps && !useOperationalLayers)
+                {
+                    var arrBaseMapLayers:Array = [];
+                    var doNotIncludeLayer:Boolean = false;
+                    mapLayers = getBaseMapLayers(map.layers as ArrayCollection);
+                    for (var i:int = 0; i < mapLayers.length; i++)
+                    {
+                        for (var n:int = 0; n < array.length; )
+                        {
+                            if (array[n].layer.id == Layer(mapLayers[i]).id)
+                            {
+                                doNotIncludeLayer = true;
+                                break;
+                            }
+                            else
+                            {
+                                n++;
+                            }
+                        }
+                        if (!doNotIncludeLayer)
+                        {
+                            arrBaseMapLayers.push({ layer: mapLayers[i]});
+                        }
+                    }
+                    populateLegend(arrBaseMapLayers.reverse());
+                }
+                else if (useBaseMaps && useOperationalLayers)
+                {
+                    var arrAllLayers:Array = [];
+                    mapLayers = getBaseMapLayers(map.layers as ArrayCollection);
+                    for (var j:int = 0; j < mapLayers.length; j++) // basemaplayers
+                    {
+                        arrAllLayers.push({ layer: mapLayers[j]});
+                    }
+                    for (var k:int = 0; k < array.length; k++) // operational layers
+                    {
+                        arrAllLayers.push({ layer: array[k].layer });
+                    }
+                    populateLegend(arrAllLayers.reverse());
+                }
+            }
+
+            private function populateLegend(array:Array):void
+            {
+                legendLayers = [];
+
+                if (array && array.length > 0)
+                {
+                    for (var j:int = 0; j < array.length; j++)
+                    {
+                        var doNotAddLayer:Boolean = false;
+                        // loop through all the excludeLayers
+                        for (var n:int = 0; n < excludeLayers.length; )
+                        {
+                            if (array[j].layer.name == excludeLayers[n])
+                            {
+                                doNotAddLayer = true;
+                                break;
+                            }
+                            else
+                            {
+                                n++;
+                            }
+                        }
+
+                        if (!doNotAddLayer)
+                        {
+                            legendLayers.push(array[j].layer);
+                        }
+                    }
+                }
+
+                if (legendLayers.length > 0)
+                {
+                    myLegend.layers = legendLayers;
+                    myLegend.map = map;
+                }
+            }
+
+            private function getBaseMapLayers(layers:ArrayCollection):Array
+            {
+                var result:Array = [];
+                var includeLayer:Boolean;
+                for (var i:int = 0; i < layers.length; i++)
+                {
+                    includeLayer = false;
+                    for (var n:int = 0; n < configData.basemaps.length; )
+                    {
+                        var type:String = String(configData.basemaps[n].type).toLowerCase();
+                        if ((type == "tiled" || type == "dynamic" || type == "feature") && configData.basemaps[n].label == Layer(layers.getItemAt(i)).id)
+                        {
+                            includeLayer = true;
+                            break;
+                        }
+                        else
+                        {
+                            n++;
+                        }
+                    }
+                    if (includeLayer)
+                    {
+                        result.push(Layer(layers.getItemAt(i)));
+                    }
+                }
+                return result;
+            }
+        ]]>
+    </fx:Script>
+
+    <viewer:WidgetTemplate width="300" height="300"
+                           minHeight="300"
+                           minWidth="300">
+        <esri:Legend id="myLegend"
+                     width="100%" height="100%"
+                     respectCurrentMapScale="{respectCurrentMapScale}"/>
+    </viewer:WidgetTemplate>
+</viewer:BaseWidget>

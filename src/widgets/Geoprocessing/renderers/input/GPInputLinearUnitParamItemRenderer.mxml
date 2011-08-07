@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+                xmlns:s="library://ns.adobe.com/flex/spark"
+                xmlns:mx="library://ns.adobe.com/flex/mx"
+                xmlns:esri="http://www.esri.com/2008/ags"
+                autoDrawBackground="false">
+    <fx:Script>
+        <![CDATA[
+            import mx.collections.ArrayList;
+
+            import widgets.Geoprocessing.parameters.IGPParameter;
+            import widgets.Geoprocessing.supportClasses.UnitMappingUtil;
+
+            private function updateDistance():void
+            {
+                data.defaultValue.distance = distanceInput.data;
+            }
+
+            private function updateUnits():void
+            {
+                data.defaultValue.units = unitSelection.selectedItem;
+            }
+
+            override public function set data(value:Object):void
+            {
+                if (value)
+                {
+                    var choiceList:Array = (value as IGPParameter).choiceList;
+                    unitSelection.dataProvider = new ArrayList(choiceList);
+
+                    var defaultUnitIndex:int = choiceList.indexOf(value.defaultValue.units);
+
+                    if (defaultUnitIndex > -1)
+                    {
+                        unitSelection.selectedIndex = defaultUnitIndex;
+                    }
+                }
+
+                super.data = value;
+            }
+
+            private function unitLabelFunction(units:String):String
+            {
+                return UnitMappingUtil.toPrettyUnits(units);
+            }
+        ]]>
+    </fx:Script>
+    <mx:FormItem width="100%"
+                 direction="horizontal"
+                 label="{data.label}"
+                 required="{data.required}">
+        <esri:DoubleField id="distanceInput"
+                          width="80"
+                          change="updateDistance()"
+                          text="{data.defaultValue.distance}"
+                          toolTip="{data.toolTip}"/>
+        <mx:ComboBox id="unitSelection"
+                     width="100%"
+                     change="updateUnits()"
+                     labelFunction="unitLabelFunction"/>
+    </mx:FormItem>
+</s:ItemRenderer>

@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2010-2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009"
+                   xmlns:s="library://ns.adobe.com/flex/spark"
+                   xmlns:mx="library://ns.adobe.com/flex/mx"
+                   xmlns:viewer="com.esri.viewer.*"
+                   widgetConfigLoaded="init()">
+    <fx:Script>
+        <![CDATA[
+            import com.esri.viewer.AppEvent;
+            import com.esri.viewer.IBaseWidget;
+            import com.esri.viewer.ViewerContainer;
+
+            import mx.collections.ArrayCollection;
+            import mx.controls.Alert;
+            import mx.utils.StringUtil;
+
+            //this function called when the widget's configuration is loaded
+            private function init():void
+            {
+                lblNumWidgets.text = ViewerContainer.getInstance().widgetManager.getNumWidgets().toString();
+                populateLoadedWidgets();
+            }
+
+            private function populateLoadedWidgets():void
+            {
+                var widgetItems:ArrayCollection = new ArrayCollection();
+                var itemTemplate:String = "Widget Id: {0}, widget label: {1}";
+
+                for each (var widgetId:Number in ViewerContainer.getInstance().widgetManager.getAllLoadedWidgetIds())
+                {
+                    widgetItems.addItem(StringUtil.substitute(itemTemplate, widgetId, ViewerContainer.getInstance().widgetManager.getWidget(widgetId).widgetTitle));
+                }
+                lstLoaderWidgets.dataProvider = widgetItems;
+            }
+
+            protected function button1_clickHandler(event:MouseEvent):void
+            {
+                populateLoadedWidgets();
+            }
+
+            protected function button2_clickHandler(event:MouseEvent):void
+            {
+                widgetDesc.text = "";
+
+                try
+                {
+                    var widget:IBaseWidget = ViewerContainer.getInstance().widgetManager.getWidget(new Number(txtId1.text), showWidget.selected);
+                    if (widget == null)
+                    {
+                        widgetDesc.text = "loading...";
+                    }
+                    else
+                    {
+                        var descTemplate:String = "Widget Id: {0}, widget state: {1}";
+                        widgetDesc.text = StringUtil.substitute(descTemplate, widget.widgetId, widget.getState());
+                    }
+                }
+                catch (error:Error)
+                {
+                    Alert.show(error.message);
+                }
+            }
+
+            protected function button3_clickHandler(event:MouseEvent):void
+            {
+                try
+                {
+                    AppEvent.dispatch(AppEvent.WIDGET_CLOSE, new Number(txtId2.text));
+                }
+                catch (error:Error)
+                {
+                    Alert.show(error.message);
+                }
+            }
+        ]]>
+    </fx:Script>
+    <viewer:WidgetTemplate id="helloWorld"
+                           width="430" height="400">
+        <viewer:layout>
+            <s:BasicLayout/>
+        </viewer:layout>
+
+        <s:Label x="10" y="18"
+                 text="Number of widgets:"/>
+        <s:Label id="lblNumWidgets"
+                 x="149" y="18"
+                 text=""/>
+        <s:Label x="15" y="66"
+                 text="Loaded widgets:"/>
+        <s:List id="lstLoaderWidgets"
+                x="115" y="60" width="267" height="99">
+        </s:List>
+        <s:Button x="115" y="167"
+                  click="button1_clickHandler(event)"
+                  label="Refresh"/>
+        <s:TextInput id="txtId1"
+                     x="89" y="222" width="94"
+                     restrict="0-9"/>
+        <s:TextInput id="txtId2"
+                     x="88" y="304" width="94"
+                     restrict="0-9"/>
+        <s:Label x="16" y="304"
+                 text="Widget ID:"/>
+        <s:Label x="17" y="222"
+                 text="Widget ID:"/>
+        <s:Button x="298" y="224"
+                  click="button2_clickHandler(event)"
+                  label="Get widget"/>
+        <s:Button x="198" y="305"
+                  click="button3_clickHandler(event)"
+                  label="close widget"/>
+        <s:CheckBox id="showWidget"
+                    x="195" y="223"
+                    label="show widget"/>
+        <s:Group x="10" y="45" width="372" height="11">
+            <s:Line width="100%">
+                <s:stroke>
+                    <s:SolidColorStroke alpha="0.3"
+                                        caps="square"
+                                        color="#C4CCCC"
+                                        weight="2"/>
+                </s:stroke>
+            </s:Line>
+        </s:Group>
+        <s:Group x="12" y="196" width="372" height="11">
+            <s:Line width="100%">
+                <s:stroke>
+                    <s:SolidColorStroke alpha="0.3"
+                                        caps="square"
+                                        color="#C4CCCC"
+                                        weight="2"/>
+                </s:stroke>
+            </s:Line>
+        </s:Group>
+        <s:Group x="12" y="286" width="372" height="11">
+            <s:Line width="100%">
+                <s:stroke>
+                    <s:SolidColorStroke alpha="0.3"
+                                        caps="square"
+                                        color="#C4CCCC"
+                                        weight="2"/>
+                </s:stroke>
+            </s:Line>
+        </s:Group>
+        <s:Group x="12" y="358" width="372" height="11">
+            <s:Line width="100%">
+                <s:stroke>
+                    <s:SolidColorStroke alpha="0.3"
+                                        caps="square"
+                                        color="#C4CCCC"
+                                        weight="2"/>
+                </s:stroke>
+            </s:Line>
+        </s:Group>
+
+        <s:Label id="widgetDesc"
+                 x="89" y="259" width="288"
+                 text=""/>
+    </viewer:WidgetTemplate>
+</viewer:BaseWidget>

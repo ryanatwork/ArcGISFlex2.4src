@@ -1,0 +1,32 @@
+<?xml version="1.0" ?>
+<configuration>
+
+    <title>Showing the Time widget</title>
+    <style>
+        <!-- Black Gold -->
+        <colors>0xFFFFFF,0x333333,0x101010,0x000000,0xFFD700</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <widget left="0" top="0" config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-14083000 3139000 -10879000 5458000" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+        </basemaps>
+        <operationallayers>
+            <layer label="Earthquakes" type="feature" visible="true"
+                   url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Earthquakes/Since_1970/MapServer/0"/>
+        </operationallayers>
+    </map>
+
+    <widgetcontainer>
+        <widget label="Animate by time"
+            config="widgets/Time/TimeWidget_QuakesSince1970.xml"
+            icon="assets/images/i_clock.png"
+            preload="open"
+            url="widgets/Time/TimeWidget.swf"
+            left="80" bottom="80"/>
+    </widgetcontainer>
+</configuration>

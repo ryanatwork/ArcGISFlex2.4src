@@ -1,0 +1,58 @@
+<?xml version="1.0" ?>
+<configuration>
+    <title>Vertical widget layout</title>
+    <subtitle>Using ArcGIS Viewer for Flex</subtitle>
+    <logo>assets/images/logo.png</logo>
+    <style>
+        <!-- Sage Green -->
+        <colors>0x333333,0xAFCFAF,0xFFFFAB,0xEAEA9D,0x333333</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <!-- UI elements -->
+    <widget right="20" top="55"    config="widgets/MapSwitcher/MapSwitcherWidget.xml" url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0"   top="0"     config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+    <widget right="-2" bottom="-2" config="widgets/OverviewMap/OverviewMapWidget.xml" url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+
+    <map initialextent="-14083000 3139000 -10879000 5458000" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+            <layer label="Aerial"  type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"/>
+            <layer label="Topo"    type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer"/>
+        </basemaps>
+        <operationallayers>
+            <layer label="Boundaries and Places" type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places_Alternate/MapServer"/>
+        </operationallayers>
+    </map>
+
+    <!-- widgets organized into widget containers that manage close/open etc -->
+    <!-- supported layout property options: horizontal(default)|float|vertical|fix-->
+    <widgetcontainer layout="vertical">
+        <widget label="Louisville Police"
+                config="widgets/Query/QueryWidget_Louisville_PoliceStations.xml"
+                preload="open"
+                icon="assets/images/i_policestation.png"
+                url="widgets/Query/QueryWidget.swf"/>
+        <widget label="Find an address"
+                config="widgets/Locate/LocateWidget_US.xml"
+                icon="assets/images/i_target.png"
+                url="widgets/Locate/LocateWidget.swf"/>
+        <widget label="Bookmarks"
+                config="widgets/Bookmark/BookmarkWidget.xml"
+                icon="assets/images/i_bookmark.png"
+                url="widgets/Bookmark/BookmarkWidget.swf"/>
+        <widget label="Layer List"
+                config="widgets/LayerList/LayerListWidget.xml"
+                icon="assets/images/i_layers.png"
+                url="widgets/LayerList/LayerListWidget.swf"/>
+        <widget label="Filter by Time"
+                config="widgets/Time/TimeWidget.xml"
+                icon="assets/images/i_clock.png"
+                url="widgets/Time/TimeWidget.swf"/>
+    </widgetcontainer>
+
+</configuration>

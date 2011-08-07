@@ -1,0 +1,5 @@
+<?xml version="1.0" ?>
+<configuration>
+    <!-- possible values for initialstate: open or closed (default) -->
+    <initialstate>open</initialstate>
+</configuration>

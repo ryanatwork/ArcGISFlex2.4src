@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<configuration label="Bing Geocoding">
+    <locator>bing</locator>
+    <zoomscale>150000</zoomscale>
+</configuration>
+
+<!--
+    See Locate widget documentation at
+    http://links.esri.com/locatewidget
+-->

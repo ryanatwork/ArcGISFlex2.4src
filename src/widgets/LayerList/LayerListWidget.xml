@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<configuration>
+    <excludelayer>Europe</excludelayer>
+    <excludelayer>Pirates</excludelayer>
+</configuration>
+
+<!--
+    See Layer List widget documentation at
+    http://links.esri.com/layerlistwidget
+-->

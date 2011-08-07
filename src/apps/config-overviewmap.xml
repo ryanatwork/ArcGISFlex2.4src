@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+<configuration>
+
+    <title>Showing the Overview Map widget</title>
+    <style>
+        <!-- Black Gold -->
+        <colors>0xFFFFFF,0x333333,0x101010,0x000000,0xFFD700</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <widget right="-2" bottom="-2"
+            config="../apps/overviewmap_open.xml"
+            url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+    <widget right="20" top="55" config="widgets/MapSwitcher/MapSwitcherWidget.xml"
+            url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0" top="0"
+            url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-14083000 3139000 -10879000 5458000" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+            <layer label="Aerial"  type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"/>
+        </basemaps>
+    </map>
+
+</configuration>

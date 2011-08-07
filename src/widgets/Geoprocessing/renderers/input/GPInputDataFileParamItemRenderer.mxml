@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+                xmlns:s="library://ns.adobe.com/flex/spark"
+                xmlns:mx="library://ns.adobe.com/flex/mx"
+                autoDrawBackground="false"
+                creationComplete="init()">
+    <fx:Script>
+        <![CDATA[
+            private function init():void
+            {
+                //trigger initial validation
+                urlInput.dispatchEvent(new Event(Event.CHANGE));
+            }
+
+            private function updateDefaultValue():void
+            {
+                data.defaultValue.url = urlInput.text;
+            }
+
+            private function clearDefaultValue():void
+            {
+                data.defaultValue.url = "";
+            }
+        ]]>
+    </fx:Script>
+    <fx:Declarations>
+        <mx:RegExpValidator id="urlValidator"
+                            expression="^(ht|f)tps?:\/\/[^\s\.]+(\.[^\s\.]+)*((\/|\.)[^\s\.]+)+\/?$"
+                            invalid="clearDefaultValue()"
+                            property="text"
+                            source="{urlInput}"
+                            trigger="{urlInput}"
+                            triggerEvent="change"
+                            valid="updateDefaultValue()"/>
+    </fx:Declarations>
+    <mx:FormItem width="100%"
+                 label="{data.label}"
+                 required="{data.required}">
+        <s:TextInput id="urlInput"
+                     width="150"
+                     text="{data.defaultValue.url}"
+                     toolTip="{data.toolTip}"/>
+    </mx:FormItem>
+</s:ItemRenderer>

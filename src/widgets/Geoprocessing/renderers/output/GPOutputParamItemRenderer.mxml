@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+                xmlns:s="library://ns.adobe.com/flex/spark"
+                xmlns:mx="library://ns.adobe.com/flex/mx"
+                autoDrawBackground="false">
+    <s:layout>
+        <s:HorizontalLayout verticalAlign="middle"/>
+    </s:layout>
+    <s:RichEditableText editable="false"
+                        fontWeight="bold"
+                        text="{data.label}"/>
+    <s:RichEditableText width="100%"
+                        editable="false"
+                        text="{data.defaultValue}"/>
+</s:ItemRenderer>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+                xmlns:s="library://ns.adobe.com/flex/spark"
+                xmlns:mx="library://ns.adobe.com/flex/mx"
+                autoDrawBackground="false">
+    <s:layout>
+        <s:HorizontalLayout verticalAlign="middle"/>
+    </s:layout>
+    <fx:Script>
+        <![CDATA[
+            import flashx.textLayout.conversion.TextConverter;
+
+            [Bindable]
+            private var url:String;
+
+            override public function set data(value:Object):void
+            {
+                super.data = value;
+
+                if (value)
+                {
+                    var color:uint = getStyle('color');
+                    url = "<a href='" + value.defaultValue.url + "' target='_blank'><font color='#" + color.toString(16) + "'>" + value.defaultValue.url + "</font></a>";
+                }
+            }
+        ]]>
+    </fx:Script>
+    <s:RichEditableText editable="false"
+                        fontWeight="bold"
+                        text="{data.label}"/>
+    <s:RichEditableText editable="false"
+                        textFlow="{TextConverter.importToFlow(url, TextConverter.TEXT_FIELD_HTML_FORMAT)}"
+                        toolTip="{data.defaultValue.url}"/>
+</s:ItemRenderer>

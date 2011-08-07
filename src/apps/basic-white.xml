@@ -1,0 +1,68 @@
+<?xml version="1.0" ?>
+<!--
+////////////////////////////////////////////////////////////////////////////////
+//
+// This configuration file does not have titles, maps, layers, or initial extent,
+// instead all of these are meant to be read from an ArcGIS.com Web Map
+//
+// Usage
+// http://myserver/flexviewer/index.html?itemid=b445000593914a9e9a4823cbb8ec76a5&config=apps/basic_white.xml
+//
+// Read more about ArcGIS Viewer for Flex - http://links.esri.com/flexviewer
+//
+////////////////////////////////////////////////////////////////////////////////
+-->
+<configuration>
+    <!-- replace the following url with your own geometryservice -->
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <style>
+        <!-- White -->
+        <colors>0x000000,0xFFFFFF,0xEFEFEF,0xFFFFFF,0x000000</colors>
+        <alpha>1.0</alpha>
+        <titlefont size="28"/>
+    </style>
+
+    <!-- UI elements -->
+    <widget left="10"  top="50"    config="widgets/Navigation/NavigationWidget.xml" url="widgets/Navigation/NavigationWidget.swf"/>
+    <widget right="-2" bottom="-2" config="widgets/OverviewMap/OverviewMapWidget.xml" url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+    <widget right="20" top="55"    config="widgets/MapSwitcher/MapSwitcherWidget.xml" url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0"   top="0"     config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map top="40" wraparound180="true">
+        <basemaps>
+        </basemaps>
+        <operationallayers>
+        </operationallayers>
+    </map>
+
+    <!-- widgets organized into widget containers that manage close/open etc -->
+    <!-- supported layout property options: horizontal(default)|float|vertical|fix-->
+    <widgetcontainer layout="float">
+        <widget label="Bookmarks"
+                icon="assets/images/i_bookmark.png"
+                config="widgets/Bookmark/BookmarkWidget.xml"
+                url="widgets/Bookmark/BookmarkWidget.swf"/>
+        <widget label="Find an address"
+                icon="assets/images/i_target.png"
+                config="widgets/Locate/LocateWidget_World.xml"
+                url="widgets/Locate/LocateWidget.swf"/>
+        <widget label="Draw and Measure"
+                icon="assets/images/i_draw2.png"
+                config="widgets/Draw/DrawWidget.xml"
+                url="widgets/Draw/DrawWidget.swf"/>
+        <widget label="Edit"
+                icon="assets/images/i_edit.png"
+                config="widgets/Edit/EditWidget.xml"
+                url="widgets/Edit/EditWidget.swf"/>
+        <widget label="Legend"
+                config="widgets/Legend/LegendWidget.xml"
+                icon="assets/images/Legend32.png"
+                url="widgets/Legend/LegendWidget.swf"/>
+        <widget label="Print" left="390" top="400"
+                icon="assets/images/i_print.png"
+                config="widgets/Print/PrintWidget.xml"
+                url="widgets/Print/PrintWidget.swf"/>
+    </widgetcontainer>
+
+</configuration>

@@ -1,0 +1,58 @@
+<?xml version="1.0" ?>
+<configuration>
+    <title>Sky Blue style</title>
+    <subtitle>ArcGIS Viewer for Flex</subtitle>
+    <style>
+        <!-- Sky Blue -->
+        <colors>0x444444,0xEBF4FF,0xEBF4FF,0xDEEBFF,0x444444</colors>
+        <alpha>0.7</alpha>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <widget left="10"  top="50"    config="widgets/Navigation/NavigationWidget.xml" url="widgets/Navigation/NavigationWidget.swf"/>
+    <widget right="-2" bottom="-2" config="widgets/OverviewMap/OverviewMapWidget.xml" url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+    <widget right="20" top="55"    config="widgets/MapSwitcher/MapSwitcherWidget.xml" url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0"   top="0"     config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-14083000 3139000 -10879000 5458000" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+            <layer label="Aerial"  type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"/>
+            <layer label="Topo"    type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer"/>
+        </basemaps>
+        <operationallayers>
+            <layer label="Boundaries and Places" type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places_Alternate/MapServer"/>
+            <layer label="Fires" type="feature" visible="false"
+                   popupconfig="popups/PopUp_Fires.xml"
+                   url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Fire/Sheep/FeatureServer/0"/>
+            <layer label="San Francisco 3-1-1 Incidents" type="feature" visible="false" alpha="1.0"
+                   popupconfig="popups/PopUp_311.xml"
+                   url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/SanFrancisco/311Incidents/FeatureServer/0"/>
+        </operationallayers>
+    </map>
+
+    <widgetcontainer layout="float"> <!--horizontal(default)|float|vertical|fix-->
+        <widget label="Bookmarks"
+            config="widgets/Bookmark/BookmarkWidget.xml"
+            icon="assets/images/i_bookmark.png"
+            left="80" top="80"
+            preload="open"
+            url="widgets/Bookmark/BookmarkWidget.swf"/>
+        <widget label="Louisville Police"
+            config="widgets/Query/QueryWidget_Louisville_PoliceStations.xml"
+            icon="assets/images/i_policestation.png"
+            left="280" top="130"
+            preload="open"
+            url="widgets/Query/QueryWidget.swf"/>
+        <widget label="Find a U.S. address"
+            config="widgets/Locate/LocateWidget_US.xml"
+            icon="assets/images/i_target.png"
+            left="480" top="180"
+            url="widgets/Locate/LocateWidget.swf"/>
+    </widgetcontainer>
+
+</configuration>

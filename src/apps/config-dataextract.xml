@@ -1,0 +1,32 @@
+<?xml version="1.0" ?>
+<configuration>
+
+    <title>Showing the Data Extract widget</title>
+    <style>
+        <!-- Cobalt Blue -->
+        <colors>0xCEE7F4,0x39628C,0x355D89,0x294867,0xCEE7F4</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <widget left="0" top="0" config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-8585000 4698000 -8565000 4715000" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+        </basemaps>
+        <operationallayers>
+            <layer label="Incident data" type="dynamic" visible="true"
+                   url="http://sampleserver4.arcgisonline.com/ArcGIS/rest/services/HomelandSecurity/Incident_Data_Extraction/MapServer"/>
+        </operationallayers>
+    </map>
+
+    <widgetcontainer layout="float">
+        <widget label="Data Extract"
+                config="widgets/DataExtract/DataExtractWidget.xml"
+                icon="assets/images/i_layers.png"
+                preload="open"
+                url="widgets/DataExtract/DataExtractWidget.swf"
+                left="80" bottom="80"/>
+    </widgetcontainer>
+</configuration>

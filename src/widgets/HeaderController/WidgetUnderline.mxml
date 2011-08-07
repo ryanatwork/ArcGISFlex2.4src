@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+////////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2011 Esri
+//
+// All rights reserved under the copyright laws of the United States.
+// You may freely redistribute and use this software, with or
+// without modification, provided you include the original copyright
+// and use restrictions.  See use restrictions in the file:
+// <install location>/License.txt
+//
+////////////////////////////////////////////////////////////////////////////////
+-->
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+         xmlns:s="library://ns.adobe.com/flex/spark"
+         xmlns:mx="library://ns.adobe.com/flex/mx">
+    <fx:Script>
+        <![CDATA[
+            [Bindable]
+            private var _widgetOpen:Boolean = false;
+
+            public function set widgetOpen(value:Boolean):void
+            {
+                _widgetOpen = value;
+            }
+        ]]>
+    </fx:Script>
+    <s:Line width="10"
+            includeInLayout="{_widgetOpen}"
+            visible="{_widgetOpen}">
+        <s:stroke>
+            <s:SolidColorStroke caps="square"
+                                color="{getStyle('focusColor')}"
+                                weight="2"/>
+        </s:stroke>
+    </s:Line>
+</s:Group>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+                xmlns:s="library://ns.adobe.com/flex/spark"
+                xmlns:mx="library://ns.adobe.com/flex/mx"
+                autoDrawBackground="false">
+    <fx:Script>
+        <![CDATA[
+            import mx.collections.ArrayList;
+
+            import widgets.Geoprocessing.parameters.IGPParameter;
+
+            [Bindable]
+            private var hasChoiceList:Boolean;
+            private var param:IGPParameter;
+
+            override public function set data(value:Object):void
+            {
+                super.data = value;
+
+                if (value)
+                {
+                    param = value as IGPParameter;
+                    hasChoiceList = (param.choiceList && param.choiceList.length > 0);
+                    if (hasChoiceList)
+                    {
+                        choiceSelection.dataProvider = new ArrayList(param.choiceList);
+                        setChoiceListDefaultValue(param.defaultValue as String);
+                    }
+                }
+            }
+
+            private function setChoiceListDefaultValue(defaultValue:String):void
+            {
+                var defaultValueIndex:int = param.choiceList.indexOf(defaultValue);
+                if (defaultValueIndex > -1)
+                {
+                    choiceSelection.selectedIndex = defaultValueIndex;
+                }
+            }
+
+            protected function updateDefaultValueWithChoice():void
+            {
+                param.defaultValue = choiceSelection.selectedItem;
+            }
+        ]]>
+    </fx:Script>
+    <mx:FormItem width="100%"
+                 label="{data.label}"
+                 required="{data.required}">
+        <s:TextInput includeInLayout="{!hasChoiceList}"
+                     text="@{data.defaultValue}"
+                     toolTip="{data.toolTip}"
+                     visible="{!hasChoiceList}"/>
+        <mx:ComboBox id="choiceSelection"
+                     change="updateDefaultValueWithChoice()"
+                     includeInLayout="{hasChoiceList}"
+                     visible="{hasChoiceList}"/>
+    </mx:FormItem>
+</s:ItemRenderer>

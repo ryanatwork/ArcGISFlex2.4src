@@ -1,0 +1,49 @@
+<?xml version="1.0" ?>
+<configuration>
+
+    <title>Showing multiple popups</title>
+    <subtitle>on operational layers and Query widget</subtitle>
+    <style>
+        <!-- Graphite Grey -->
+        <colors>0xCCCCCC,0x777777,0x555555,0x333333,0xCCCCCC</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <widget left="10"  top="50"    config="widgets/Navigation/NavigationWidget.xml" url="widgets/Navigation/NavigationWidget.swf"/>
+    <widget right="-2" bottom="-2" config="widgets/OverviewMap/OverviewMapWidget.xml" url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+    <widget right="20" top="55"    config="widgets/MapSwitcher/MapSwitcherWidget.xml" url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0"   top="0"     config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-13241641 3967929 -13003157 4110407" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+        </basemaps>
+        <operationallayers>
+            <layer label="Fires" type="feature" visible="true" alpha="1.0"
+                   popupconfig="popups/PopUp_Fires.xml"
+                   url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Fire/Sheep/FeatureServer/0"/>
+            <layer label="Hurricanes" type="feature" visible="false" alpha="1.0"
+                   popupconfig="popups/PopUp_Hurricanes.xml"
+                   definitionexpression="NAME &lt;&gt; 'NOTNAMED' AND CAT IN ('H1','H2','H3')"
+                   url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Hurricanes/NOAA_Tracks_1851_2007/MapServer/0"/>
+        </operationallayers>
+    </map>
+
+    <widgetcontainer>
+        <widget label="Showing Earthquakes using GeoRSS Widget"
+                config="widgets/GeoRSS/GeoRSSWidget.xml"
+                icon="assets/images/i_rss.png"
+                left="80" bottom="80"
+                preload="open"
+                url="widgets/GeoRSS/GeoRSSWidget.swf"/>
+        <widget label="Latest Earthquakes (using QueryWidget)"
+                icon="assets/images/i_target.png"
+                config="widgets/Query/QueryWidget_Earthquakes.xml"
+                url="widgets/Query/QueryWidget.swf"/>
+        <widget label="Louisville Police (using QueryWidget)"
+                icon="assets/images/i_policestation.png"
+                config="widgets/Query/QueryWidget_Louisville_PoliceStations.xml"
+                url="widgets/Query/QueryWidget.swf"/>
+    </widgetcontainer>
+</configuration>

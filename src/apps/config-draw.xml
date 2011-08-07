@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+<configuration>
+
+    <title>Showing the Draw widget</title>
+    <style>
+        <!-- Cobalt Blue -->
+        <colors>0xCEE7F4,0x39628C,0x355D89,0x294867,0xCEE7F4</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <widget left="0" top="0" config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-14083000 3139000 -10879000 5458000" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+        </basemaps>
+    </map>
+
+    <widgetcontainer layout="float">
+        <widget label="Draw and Measure"
+            config="widgets/Draw/DrawWidget.xml"
+            icon="assets/images/i_draw.png"
+            preload="open"
+            url="widgets/Draw/DrawWidget.swf"
+            left="80" bottom="80"/>
+    </widgetcontainer>
+</configuration>

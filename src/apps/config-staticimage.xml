@@ -1,0 +1,31 @@
+<?xml version="1.0" ?>
+<configuration>
+
+    <title>Showing the Static Image widget</title>
+    <style>
+        <!-- Black Gold -->
+        <colors>0xFFFFFF,0x333333,0x101010,0x000000,0xFFD700</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <widget left="0" top="0" config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-13241641 3967929 -13003157 4110407" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+        </basemaps>
+        <operationallayers>
+            <layer label="Fires" type="feature" visible="true" alpha="1.0"
+                   popupconfig="popups/PopUp_Fires.xml"
+                   url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Fire/Sheep/FeatureServer/0"/>
+        </operationallayers>
+    </map>
+
+    <widget
+        config="widgets/StaticImage/StaticImageWidget.xml"
+        label="Static Image"
+        preload="open"
+        url="widgets/StaticImage/StaticImageWidget.swf"
+        left="20" top="320"/>
+</configuration>

@@ -1,0 +1,51 @@
+<?xml version="1.0" ?>
+<!--
+////////////////////////////////////////////////////////////////////////////////
+//
+// Read more about ArcGIS Viewer for Flex - http://links.esri.com/flexviewer
+//
+////////////////////////////////////////////////////////////////////////////////
+-->
+<configuration>
+    <title>Homeland Security</title>
+    <subtitle>Washington, D.C.</subtitle>
+    <logo>assets/images/logo.png</logo>
+    <style>
+        <!-- Black Gold -->
+        <colors>0xFFFFFF,0x333333,0x101010,0x000000,0xFFD700</colors>
+    </style>
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <!-- UI elements -->
+    <widget left="10"  top="50"    config="widgets/Navigation/NavigationWidget.xml" url="widgets/Navigation/NavigationWidget.swf"/>
+    <widget right="-2" bottom="-2" config="widgets/OverviewMap/OverviewMapWidget.xml" url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+    <widget right="20" top="55"    config="widgets/MapSwitcher/MapSwitcherWidget.xml" url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0"   top="0"     config="widgets/HeaderController/HeaderControllerWidget.xml" url="widgets/HeaderController/HeaderControllerWidget.swf"/>
+
+    <map initialextent="-8585000 4698000 -8565000 4715000" top="40" wraparound180="true">
+        <basemaps>
+            <layer label="Streets" type="tiled" visible="true"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"/>
+            <layer label="Aerial"  type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"/>
+            <layer label="Topo"    type="tiled" visible="false"
+                   url="http://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer"/>
+        </basemaps>
+         <operationallayers>
+             <layer label="HomeLand Security Incident Points" type="feature" visible="true"
+                   popupconfig="popups/PopUp_IncidentPoints.xml"
+                   url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/HomelandSecurity/operations/FeatureServer/0"/>
+             <layer label="Homeland Security Incident Areas" type="feature" visible="true"
+                   popupconfig="popups/PopUp_IncidentAreas.xml"
+                   url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/HomelandSecurity/operations/FeatureServer/2"/>
+        </operationallayers>
+    </map>
+
+    <widgetcontainer layout="float"> <!--horizontal(default)|float|vertical|fix-->
+        <widget label="Edit" preload="open" left="75" bottom="75"
+            icon="assets/images/i_edit.png"
+            config="widgets/Edit/EditWidget.xml"
+            url="widgets/Edit/EditWidget.swf"/>
+    </widgetcontainer>
+
+</configuration>

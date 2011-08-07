@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     ////////////////////////////////////////////////////////////////////////////////
+     //
+     // Copyright (c) 2011 Esri
+     //
+     // All rights reserved under the copyright laws of the United States.
+     // You may freely redistribute and use this software, with or
+     // without modification, provided you include the original copyright
+     // and use restrictions.  See use restrictions in the file:
+     // <install location>/License.txt
+     //
+     ////////////////////////////////////////////////////////////////////////////////
+-->
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+                xmlns:s="library://ns.adobe.com/flex/spark"
+                xmlns:mx="library://ns.adobe.com/flex/mx"
+                autoDrawBackground="false"
+                creationComplete="init()">
+    <fx:Script>
+        <![CDATA[
+            import com.esri.ags.events.DrawEvent;
+            import com.esri.ags.tools.DrawTool;
+
+            import mx.collections.ArrayCollection;
+
+            import widgets.Geoprocessing.parameters.FeatureLayerParameter;
+            import widgets.Geoprocessing.parameters.IGPFeatureParameter;
+            import widgets.Geoprocessing.supportClasses.FeatureInputParamEvent;
+            import widgets.Geoprocessing.supportClasses.InputParamDataGroup;
+
+            private const VIEWER_STRINGS:String = "ViewerStrings";
+
+            [Bindable]
+            private var graphicsProvider:ArrayCollection;
+            private var selectedDrawingIcon:Image;
+
+            private function init():void
+            {
+                (owner as IEventDispatcher).addEventListener(DrawEvent.DRAW_END, map_drawEndHandler, false, 0, true);
+            }
+
+            private function map_drawEndHandler(event:DrawEvent):void
+            {
+                selectedDrawingIcon = null;
+                clearSelectionFilter();
+            }
+
+            override public function set data(value:Object):void
+            {
+                if (value)
+                {
+                    var featureParam:IGPFeatureParameter = value as IGPFeatureParameter;
+
+                    if (featureParam.geometryType == FeatureLayerParameter.POINT)
+                    {
+                        currentState = "drawPoint";
+                    }
+                    else if (featureParam.geometryType == FeatureLayerParameter.POLYGON)
+                    {
+                        currentState = "drawPolygon";
+                    }
+                    else if (featureParam.geometryType == FeatureLayerParameter.POLYLINE)
+                    {
+                        currentState = "drawPolyline";
+                    }
+                    else
+                    {
+                        currentState = "drawAll";
+                    }
+
+                    graphicsProvider = featureParam.layer.graphicProvider as ArrayCollection;
+                }
+
+                super.data = value;
+            }
+
+            private function drawIcon_rollOverHandler(event:MouseEvent):void
+            {
+                clearSelectionFilter();
+                event.target.filters = [ glowFilter ];
+            }
+
+            private function drawIcon_rollOutHandler(event:MouseEvent):void
+            {
+                clearSelectionFilter();
+            }
+
+            private function drawIcon_clickHandler(event:MouseEvent):void
+            {
+                selectedDrawingIcon = event.currentTarget as Image;
+                clearSelectionFilter();
+                selectedDrawingIcon.filters = [ glowFilter ];
+                dispatchFeatureInputDrawEvent(selectedDrawingIcon.name);
+            }
+
+            private function clearSelectionFilter():void
+            {
+                var totalChildren:int = drawImageGroup.numChildren;
+                var currentDisplayObject:DisplayObject;
+
+                for (var i:int = 0; i < totalChildren; i++)
+                {
+                    currentDisplayObject = drawImageGroup.getChildAt(i);
+                    if (currentDisplayObject != selectedDrawingIcon)
+                    {
+                        currentDisplayObject.filters = [];
+                    }
+                }
+            }
+
+            private function dispatchFeatureInputDrawEvent(drawType:String):void
+            {
+                var featureInputParamEvent:FeatureInputParamEvent = new FeatureInputParamEvent(FeatureInputParamEvent.DRAW, data as IGPFeatureParameter, drawType);
+                (owner as InputParamDataGroup).dispatchFeatureInputParamEvent(featureInputParamEvent)
+            }
+
+            public function getDefaultString(resourceName:String):String
+            {
+                return resourceManager.getString(VIEWER_STRINGS, resourceName);
+            }
+        ]]>
+    </fx:Script>
+    <fx:Declarations>
+        <mx:GlowFilter id="glowFilter"
+                       alpha="1"
+                       color="{getStyle('focusColor')}"
+                       inner="true"
+                       strength="2"/>
+    </fx:Declarations>
+    <s:states>
+        <s:State name="drawPoint"/>
+        <s:State name="drawPolyline"/>
+        <s:State name="drawPolygon"/>
+        <s:State name="drawAll"/>
+    </s:states>
+    <mx:FormItem width="100%"
+                 label="{data.label}"
+                 required="{data.required}">
+        <s:HGroup id="drawImageGroup"
+                  width="100%"
+                  gap="0">
+            <mx:Image name="{DrawTool.MAPPOINT}"
+                      width="40" height="40"
+                      buttonMode="true"
+                      click="drawIcon_clickHandler(event)"
+                      includeIn="drawPoint, drawAll"
+                      rollOut="drawIcon_rollOutHandler(event)"
+                      rollOver="drawIcon_rollOverHandler(event)"
+                      source="assets/images/i_draw_point.png"
+                      toolTip="{getDefaultString('drawPointLabel')}"
+                      useHandCursor="true"/>
+            <mx:Image name="{DrawTool.POLYLINE}"
+                      width="40" height="40"
+                      buttonMode="true"
+                      click="drawIcon_clickHandler(event)"
+                      includeIn="drawPolyline, drawAll"
+                      rollOut="drawIcon_rollOutHandler(event)"
+                      rollOver="drawIcon_rollOverHandler(event)"
+                      source="assets/images/i_draw_line.png"
+                      toolTip="{getDefaultString('drawLineLabel')}"
+                      useHandCursor="true"/>
+            <mx:Image name="{DrawTool.FREEHAND_POLYLINE}"
+                      width="40" height="40"
+                      buttonMode="true"
+                      click="drawIcon_clickHandler(event)"
+                      includeIn="drawPolyline, drawAll"
+                      rollOut="drawIcon_rollOutHandler(event)"
+                      rollOver="drawIcon_rollOverHandler(event)"
+                      source="assets/images/i_draw_freeline.png"
+                      toolTip="{getDefaultString('drawFreehandLineLabel')}"
+                      useHandCursor="true"/>
+            <mx:Image name="{DrawTool.EXTENT}"
+                      width="40" height="40"
+                      buttonMode="true"
+                      click="drawIcon_clickHandler(event)"
+                      includeIn="drawPolygon, drawAll"
+                      rollOut="drawIcon_rollOutHandler(event)"
+                      rollOver="drawIcon_rollOverHandler(event)"
+                      source="assets/images/i_draw_rect.png"
+                      toolTip="{getDefaultString('drawRectangleLabel')}"
+                      useHandCursor="true"/>
+            <mx:Image name="{DrawTool.CIRCLE}"
+                      width="40" height="40"
+                      buttonMode="true"
+                      click="drawIcon_clickHandler(event)"
+                      includeIn="drawPolygon, drawAll"
+                      rollOut="drawIcon_rollOutHandler(event)"
+                      rollOver="drawIcon_rollOverHandler(event)"
+                      source="assets/images/i_draw_circle.png"
+                      toolTip="{getDefaultString('drawCircleLabel')}"
+                      useHandCursor="true"/>
+            <mx:Image name="{DrawTool.ELLIPSE}"
+                      width="40" height="40"
+                      buttonMode="true"
+                      click="drawIcon_clickHandler(event)"
+                      includeIn="drawPolygon, drawAll"
+                      rollOut="drawIcon_rollOutHandler(event)"
+                      rollOver="drawIcon_rollOverHandler(event)"
+                      source="assets/images/i_draw_ellipse.png"
+                      toolTip="{getDefaultString('drawEllipseLabel')}"
+                      useHandCursor="true"/>
+            <mx:Image name="{DrawTool.POLYGON}"
+                      width="40" height="40"
+                      buttonMode="true"
+                      click="drawIcon_clickHandler(event)"
+                      includeIn="drawPolygon, drawAll"
+                      rollOut="drawIcon_rollOutHandler(event)"
+                      rollOver="drawIcon_rollOverHandler(event)"
+                      source="assets/images/i_draw_poly.png"
+                      toolTip="{getDefaultString('drawPolygonLabel')}"
+                      useHandCursor="true"/>
+            <mx:Image name="{DrawTool.FREEHAND_POLYGON}"
+                      width="40" height="40"
+                      buttonMode="true"
+                      click="drawIcon_clickHandler(event)"
+                      includeIn="drawPolygon, drawAll"
+                      rollOut="drawIcon_rollOutHandler(event)"
+                      rollOver="drawIcon_rollOverHandler(event)"
+                      source="assets/images/i_draw_freepoly.png"
+                      toolTip="{getDefaultString('drawFreehandPolygonLabel')}"
+                      useHandCursor="true"/>
+        </s:HGroup>
+        <s:Label buttonMode="true"
+                 click="(owner as InputParamDataGroup).dispatchFeatureInputParamEvent(new FeatureInputParamEvent(FeatureInputParamEvent.CLEAR, data as IGPFeatureParameter))"
+                 fontWeight="bold"
+                 text="Clear"
+                 textDecoration="underline"
+                 toolTip="{getDefaultString('drawClearLabel')}"
+                 visible="{graphicsProvider.length &gt; 0}"/>
+    </mx:FormItem>
+</s:ItemRenderer>
