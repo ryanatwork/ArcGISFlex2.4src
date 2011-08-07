@@ -1,0 +1,3266 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+	////////////////////////////////////////////////////////////////////////////////
+	//
+	// Copyright © 2010 ESRI
+	//
+	// All rights reserved under the copyright laws of the United States.
+	// You may freely redistribute and use this software, with or
+	// without modification, provided you include the original copyright
+	// and use restrictions.  See use restrictions in the file:
+	// <install location>/FlexViewer/License.txt
+	//
+	////////////////////////////////////////////////////////////////////////////////
+-->
+
+<!-- 
+	Version 2.4.0.1 - 08/5/2011
+	* Bug fix for null value in link field not being handled correctly
+    * added the Flex API PopUpInfoRendererSkin.mxml fix
+    * added the new useutc attribute to the field element
+--> 
+<viewer:BaseWidget xmlns:esri			="http://www.esri.com/2008/ags"
+				   xmlns:fx				="http://ns.adobe.com/mxml/2009"
+				   xmlns:s				="library://ns.adobe.com/flex/spark"
+				   xmlns:mx				="library://ns.adobe.com/flex/mx"
+				   xmlns:mxeffects     	="com.adobe.ac.mxeffects.*"
+				   xmlns:viewer        	="com.esri.viewer.*"
+				   xmlns:Search       	="widgets.eSearch.*"
+				   currentState			="textInput"
+				   widgetConfigLoaded	="init()">
+	<viewer:states>
+		<s:State name="graphicalInput"/>
+		<s:State name="textInput"/>
+		<s:State name="spatialInput" />
+		<s:State name="resultsList"/>
+	</viewer:states>
+	
+	<viewer:transitions>
+		<s:Transition autoReverse="true" toState="*">
+			<s:Fade targets="{[graphicalInput, textInput, spatialInput, resultsList]}"/>
+		</s:Transition>
+	</viewer:transitions>
+	
+	<fx:Declarations>
+		<s:GlowFilter id="glowFilter"
+					  alpha="1"
+					  color="{getStyle('focusColor')}"
+					  inner="true"
+					  strength="2"/>
+		<esri:GeometryService id="geometryService"
+							  fault="geometryService_faultHandler(event)"
+							  url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer"/>
+		<s:ColorMatrixFilter id="cOver" matrix="[0.5,0.5,0.5,0,0,0.5,0.5,0.5,0,0,0.5,0.5,0.5,0,0,0,0,0,0.6,0]"/>
+	</fx:Declarations>
+	
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace esri "http://www.esri.com/2008/ags";
+		esri|PopUpRenderer
+		{
+			skinClass:ClassReference('widgets.eSearch.PopUpRendererSkin');
+		}
+	</fx:Style>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.Map;
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.events.DrawEvent;
+			import com.esri.ags.events.ExtentEvent;
+			import com.esri.ags.events.GeometryServiceEvent;
+			import com.esri.ags.events.GraphicEvent;
+			import com.esri.ags.events.GraphicsLayerEvent;
+			import com.esri.ags.events.LayerEvent;
+			import com.esri.ags.events.MapEvent;
+			import com.esri.ags.geometry.Extent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.geometry.Multipoint;
+			import com.esri.ags.geometry.Polygon;
+			import com.esri.ags.geometry.Polyline;
+			import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+			import com.esri.ags.layers.FeatureLayer;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.CodedValue;
+			import com.esri.ags.layers.supportClasses.CodedValueDomain;
+			import com.esri.ags.layers.supportClasses.FeatureType;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.layers.supportClasses.LayerDetails;
+			import com.esri.ags.symbols.PictureMarkerSymbol;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.SimpleMarkerSymbol;
+			import com.esri.ags.symbols.Symbol;
+			import com.esri.ags.tasks.GeometryServiceSingleton;
+			import com.esri.ags.tasks.QueryTask;
+			import com.esri.ags.tasks.supportClasses.BufferParameters;
+			import com.esri.ags.tasks.supportClasses.Query;
+			import com.esri.ags.tools.DrawTool;
+			import com.esri.ags.utils.GeometryUtil;
+			import com.esri.ags.utils.GraphicUtil;
+			import com.esri.ags.webmap.PopUpRenderer;
+			import com.esri.ags.webmap.supportClasses.PopUpInfo;
+			import com.esri.ags.webmap.supportClasses.PopUpMediaInfo;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.components.TitlebarButton;
+			import com.esri.viewer.components.toc.utils.MapUtil;
+			
+			import mx.collections.*;
+			import mx.controls.Alert;
+			import mx.controls.ToolTip;
+			import mx.core.IToolTip;
+			import mx.core.IUIComponent;
+			import mx.core.UIComponent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.ScrollEvent;
+			import mx.events.ToolTipEvent;
+			import mx.formatters.CurrencyFormatter;
+			import mx.formatters.DateFormatter;
+			import mx.formatters.NumberFormatter;
+			import mx.managers.PopUpManager;
+			import mx.managers.PopUpManagerChildList;
+			import mx.managers.ToolTipManager;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.ObjectUtil;
+			import mx.utils.StringUtil;
+			
+			import spark.components.supportClasses.ItemRenderer;
+			
+			//labels
+			private var graphicalsearchLabel:String;
+			private var textsearchLabel:String;
+			private var resultsLabel:String;
+			private var gridresultsLabel:String;
+			[Bindable]
+			private var enableMultiPartSearch:String;
+			[Bindable]
+			private var lblTolerance:String;
+			[Bindable]
+			private var layerLabel:String;
+			[Bindable]
+			private var layerExprLabel:String;
+			private var nolayerLabel:String;
+			[Bindable]	
+			private var submitLabel:String;	
+			[Bindable]
+			private var pointLabel:String;
+			[Bindable]
+			private var bufferAlphaLabel:String;
+			[Bindable]
+			private var bufferColorLabel:String;
+			[Bindable]
+			private var lineLabel:String;
+			[Bindable]
+			private var rectangleLabel:String;
+			[Bindable]
+			private var polygonLabel:String;
+			[Bindable]
+			private var clearLabel:String;
+			[Bindable]
+			private var zoomallLabel:String;
+			[Bindable]
+			private var zoomallTip:String;
+			private var loadingLabel:String;	
+			private var selectionLabel:String;		
+			[Bindable]
+			private var drawGraLabel:String;
+			[Bindable]
+			private var bufferGraLabel:String;
+			[Bindable]
+			private var msgVisible:Boolean = false;
+			[Bindable]
+			private var searchLayerLabel:String;
+			[Bindable]
+			private var relatLayerWhereLabel:String;
+			[Bindable]
+			private var bufferLabel:String;
+			[Bindable]
+			private var drawGraphicsLayer:GraphicsLayer;
+			[Bindable]
+			private var bufferGraphicsLayer:GraphicsLayer;
+			
+			//Properties
+			[Bindable]
+			private var eDrawEnabled:Boolean = false;
+			[Bindable]
+			private var pBufferEnabled:Boolean = false;
+			[Bindable]
+			private var applyBufferLabel:String;
+			private var resultsFeatureSet:FeatureSet;
+			private var zoomScale:Number = 5000;
+			private var configSearchGraphical:Array;
+			private var configSearchText:Array;
+			private var configDomainVals:Array;
+			private var configUserVals:Array;
+			private var queryLayer:FeatureLayer;
+			private var queryGeom:Geometry;
+			private var queryExpr:String;
+			private var queryFields:XMLList;
+			private var gridFields:Array = [];
+			private var gridHyperFields:Array = [];
+			private var gridHyperFieldsAlias:Boolean;
+			private var queryTitleField:String;
+			private var queryLinkPre:String = "";
+			private var queryLinkField:String = "";
+			private var queryLinkSuffix:String = "";
+			private var queryLinkIcon:String = "";
+			private var queryLinkIconPre:String = "";
+			private var queryLinkIconSuffix:String = "";
+			private var queryDefExpr:String = "";
+			private var queryLinkIconIsField:Boolean;
+			private var queryEnableExport:Boolean;
+			private var timer:Timer;
+			private const ICON_URL:String = "assets/images/";
+			private var WIDGET_URL:String = "widgets/eSearch/assets/images/";
+			private var gridDataProvider:Object;
+			private var wFields:ArrayCollection;
+			private var myfloatdg:SearchWidgetFloatDG;
+			private var sWidget:SearchWidget;
+			private var _csvName:String;
+			private var fldAliases:Object;
+			private var queryMultiImgField:String;
+			private var graphicsLayerBuffer:GraphicsLayer;
+			private var configSpatialSearchLayers:Array;
+			private var configSpatialSearchRelation:Array;
+			private var configLayerExprs:Array;
+			private var configBufferUnits:Array;
+			private var spatialsearchLabel:String;
+			private var geomArr:Array;
+			private var csvSep:String;
+			private var expBtnLbl:String;
+			private var exp2csvOptLbl:String;
+			private var exp2txtOptLbl:String;
+			private var queryExprForSpatRel:Boolean;
+			private var sReff:SpatialReference;
+			private var pltol:int;
+			private var disableButtons:String;
+			private var defaultSelectionOption:String;
+			private var qLayer:FeatureLayer;
+			private var layerDetails:LayerDetails;
+			private var myTip:ToolTip;
+			private var selectedDrawingIcon:Image;
+			private var lState:String = "textInput";
+			private var lblSum:String;
+			private var sumField:String;
+			private var pointSearchTolerance:Number = 6;
+			private var popUpRenderer:PopUpRenderer = new PopUpRenderer();
+			private var openDataGrid:Boolean;
+			private var lastTool:String;
+			private var graGraphicsLayer:GraphicsLayer;
+			private var selectedGraphicalTool:String;
+			[Bindable]
+			private var multiPartGraphicSearch:Boolean;
+			
+			private var floatorfixed:String;
+			
+			[Bindable]
+			private var searchResultAC:ArrayCollection;
+			//Formatters
+			[Bindable]
+			private var graphicsLayer:GraphicsLayer;
+			private var dateFormatter:DateFormatter = new DateFormatter();
+			private var numFormatter:NumberFormatter = new NumberFormatter();
+			private var currFormatter:CurrencyFormatter = new CurrencyFormatter();
+			
+			//Symbols
+			private var drawSymbol:Symbol;
+			private var resultMarkerSymbol:Symbol;
+			private var resultLineSymbol:Symbol;
+			private var resultFillSymbol:Symbol;
+			private var overFillSymbol:Symbol;
+			
+			
+			private function init():void
+			{					
+				sWidget = this;
+				WIDGET_URL = config.substring(0,config.lastIndexOf("/")) + "/assets/images/";
+				if (configXML)
+				{
+					if (GeometryServiceSingleton.instance.url) // using GeometryServiceSingleton
+					{
+						geometryService.url = GeometryServiceSingleton.instance.url;
+						geometryService.token = GeometryServiceSingleton.instance.token;
+						geometryService.proxyURL = GeometryServiceSingleton.instance.proxyURL;
+					}
+					//labels
+					bufferColorLabel = configXML.labels.buffercolor || "Select buffer color";
+					bufferAlphaLabel = configXML.labels.bufferalpha || "Adjust buffer alpha"
+					lblTolerance = configXML.labels.addtolerance || "Add search tolerance to point selection";
+					drawGraLabel = configXML.labels.existingdrawgraphicslabel || "Use Existing Draw Widget Graphics";
+					bufferGraLabel = configXML.labels.existingbuffergraphicslabel || "Use Existing Point Buffer Widget Graphics";
+					graphicalsearchLabel = configXML.labels.graphicalsearchlabel || "Graphical Search";
+					textsearchLabel = configXML.labels.textsearchlabel || "Text Search";
+					resultsLabel = configXML.labels.resultslabel || "Results";
+					layerLabel = configXML.labels.layerlabel || "Search Layer:";
+					layerExprLabel = configXML.labels.layerfieldlabel || "Search Layer Field:";
+					nolayerLabel = configXML.labels.nolayerlabel || "No search layer defined.";
+					submitLabel = configXML.labels.submitlabel || "Search";
+					pointLabel = configXML.labels.pointlabel || "Select by Point";
+					lineLabel = configXML.labels.linelabel || "Select by Line";
+					rectangleLabel = configXML.labels.rectanglelabel || "Select by Rectangle";
+					polygonLabel = configXML.labels.polygonlabel || "Select by Polygon";
+					clearLabel = configXML.labels.clearlabel || "Clear";
+					zoomallLabel = configXML.labels.zoomalllabel || "Zoom";
+					zoomallTip = configXML.labels.zoomalltip || "Zoom to all results";
+					loadingLabel = configXML.labels.loadinglabel || "Loading...";
+					selectionLabel = configXML.labels.selectionlabel || "Features Selected:";
+					gridresultsLabel = configXML.labels.gridresultsLabel || "Show Results in Grid";
+					exp2csvOptLbl = configXML.labels.export2csvbuttonlabel || "Export to CSV...";
+					exp2txtOptLbl = configXML.labels.export2txtbuttonlabel || "Export to Txt...";
+					expBtnLbl = configXML.labels.exportbtnlabel || "Export...";
+					_csvName = configXML.labels.csvdefaultname || "Selected Records";
+					csvSep = configXML.csvSeparator;
+					spatialsearchLabel = configXML.labels.spatialsearchlabel || "Spatial search";
+					searchLayerLabel = configXML.labels.searchlayerlabel || "Search entities of:";
+					bufferLabel = configXML.labels.bufferlabel || "apply a search distance:";
+					applyBufferLabel = configXML.labels.applybufferlabel || "Apply buffer";
+					sReff = new SpatialReference(configXML.spatialReference);
+					pltol = configXML.toleranceforpointgraphicalselection || 3;
+					defaultSelectionOption = configXML.defaultselectionoption || "textInput";
+					currentState = defaultSelectionOption;
+					disableButtons = configXML.disablebuttons || "";
+					selectedGraphicalTool = configXML.selectedgraphicaltool || "";
+					enableMultiPartSearch = configXML.enablemultipartsearch || "enable multi-part graphics";
+					
+					configSpatialSearchRelation = [];
+					var operList:XMLList = configXML..spatialrelationship;
+					var sOpBtn:Image;
+					for (var s:Number = 0; s < operList.length(); s++)
+					{
+						var srName:String = operList[s].name;
+						var srLabel:String = operList[s].label;
+						var spatialRelationship:Object =
+						{
+							name: srName,
+							label: srLabel
+						};
+						sOpBtn = new Image();
+						sOpBtn.name = srName;
+						sOpBtn.source = getSopImg(srName);
+						sOpBtn.toolTip = srLabel;
+						sOpBtn.addEventListener(MouseEvent.CLICK, sOpBtnClickHandler);
+						sOpBtn.useHandCursor = true;
+						sOpBtn.buttonMode = true;
+						SpatialOps.addElement(sOpBtn);
+						configSpatialSearchRelation.push(spatialRelationship);
+					}
+					if(operList.length() == 0){
+						lblSearchLayerSpatial.visible = false;
+						cboSearchLayerSpatial.visible = false;
+						SpatialOps.visible = false;
+						lblSearchLayerSpatial.includeInLayout = false;
+						cboSearchLayerSpatial.includeInLayout = false;
+						SpatialOps.includeInLayout = false;
+					}
+					
+					eDrawEnabled = configXML.enabledrawgraphicbutton && configXML.enabledrawgraphicbutton == "true";
+					pBufferEnabled = configXML.enablebuffergraphicbutton && configXML.enablebuffergraphicbutton == "true";
+					multiPartGraphicSearch = configXML.multipartgraphicsearch && configXML.multipartgraphicsearch == "true";
+					(multiPartGraphicSearch.valueOf() == true) ? graFeatureQueryBtn.visible = true : graFeatureQueryBtn.visible = false;
+					floatorfixed = configXML.floatorfixed || "float";
+					
+					if(eDrawEnabled){
+						eDrawBtn.filters = [cOver];
+						eDrawBtn.buttonMode = eDrawBtn.useHandCursor = eDrawBtn.enabled = false;
+						map.addEventListener(MapEvent.LAYER_ADD, checkForGL);					
+						MapUtil.forEachMapLayer(map, function(layer:Layer):void
+						{
+							if(layer.name.toLowerCase() == "draw features"){
+								drawGraphicsLayer = layer as GraphicsLayer;
+								drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkDrawNumGras);
+								drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkDrawNumGras);
+								drawGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkDrawNumGras);
+							}
+						});
+					}
+					
+					if(pBufferEnabled){
+						pBufferBtn.filters = [cOver];
+						pBufferBtn.buttonMode = pBufferBtn.useHandCursor = pBufferBtn.enabled = false;
+						map.addEventListener(MapEvent.LAYER_ADD, checkForGL2);					
+						MapUtil.forEachMapLayer(map, function(layer:Layer):void
+						{
+							if(layer.name.toLowerCase() == "buffer results"){
+								bufferGraphicsLayer = layer as GraphicsLayer;
+								bufferGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkBufferNumGras);
+								bufferGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkBufferNumGras);
+								bufferGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkBufferNumGras);
+							}
+						});
+					}
+					
+					configBufferUnits = [];
+					var bufferUnitsList:XMLList = configXML..bufferunit;
+					for (var b:int = 0; b < bufferUnitsList.length(); b++)
+					{
+						var buffUnitName:String = bufferUnitsList[b].name;
+						var buffUnitLabel:String = bufferUnitsList[b].label;
+						var bufferUnit:Object =
+						{
+							name: buffUnitName,
+							label: buffUnitLabel
+						};
+						configBufferUnits.push(bufferUnit);
+					}
+										
+					configSearchGraphical = [];
+					configSearchText = [];
+					configSpatialSearchLayers = [];
+					configDomainVals = [];
+					
+					var lyrList:XMLList = configXML..layer;
+					for (var i:Number = 0; i < lyrList.length(); i++)
+					{
+						configLayerExprs = [];
+						var lyrURL:String = lyrList[i].url;
+						var lyrLabel:String = lyrList[i].name;
+						var lyrGraphicalLabel:String = lyrList[i].graphicalsearchlabel;
+						var lyrExprList:XMLList = configXML.layers.layer[i]..expression;
+						
+						for (var j:Number = 0; j < lyrExprList.length(); j++)
+						{
+							var lyrExprAlias:String = lyrExprList[j].@alias;
+							var lyrTextLabel:String = lyrExprList[j].@textsearchlabel;
+							var lyrExpr:String = lyrExprList[j];
+							var lyrField:String = lyrExprList[j].@field;
+							var lyrUserList:String = lyrExprList[j].@userlist;
+							var lyrDomain:Boolean = lyrExprList[j].@usedomain && lyrExprList[j].@usedomain == "true";
+							var expr:Object = 
+							{
+								label: lyrExprAlias,
+								textlabel: lyrTextLabel,
+								expression: lyrExpr,
+								field: lyrField,
+								usedomain: lyrDomain,
+								userlist: lyrUserList 
+							}
+							configLayerExprs.push(expr);
+						}
+						var lyrDefExpr:String = lyrList[i].definitionexpression;
+						var lyrFields:XMLList = lyrList[i].fields;
+						var lyrTitleField:String = lyrList[i].titlefield;
+						var lyrLinkField:String = lyrList[i].linkfield;
+						var lyrLinkPre:String = lyrList[i].linkfield.@linkprefix;
+						var lyrLinkSuffix:String = lyrList[i].linkfield.@linksuffix;
+						var lyrLinkIcon:String = lyrList[i].icon;
+						var lyrLinkIconIsField:Boolean = lyrList[i].icon.@isfield && lyrList[i].icon.@isfield == "true";
+						var lyrLinkIconPre:String = lyrList[i].icon.@iconprefix;
+						var lyrLinkIconSuffix:String = lyrList[i].icon.@iconsuffix;
+						var lyrEnableExport:Boolean = lyrList[i].enableexport && lyrList[i].enableexport == "true";
+						
+						var lyrMultiImgField:String = lyrList[i].multiimagefield;
+						var useProxy:Boolean = lyrList[i].useproxy && lyrList[i].useproxy == "true";
+						var useAMF:String = lyrList[i].useamf;
+						var openDG:Boolean = lyrList[i].autoopendatagrid && lyrList[i].autoopendatagrid == "true";
+						if ((lyrList[i].zoomscale.@usegeometry) && (lyrList[i].zoomscale.@usegeometry == "true"))
+						{
+							zoomScale = Number.NaN;
+						}else{
+							if (Number(lyrList[i].zoomscale) > 0)
+								zoomScale = Number(lyrList[i].zoomscale);
+						}
+						
+						var lyrSpatialLabel:String = lyrList[i].spatialquerylabel;
+						var lyrSpatialSearchLyr:String = lyrList[i].spatialsearchlayer;
+						
+						var layer:FeatureLayer = new FeatureLayer(lyrURL);
+						if (useProxy && configData.proxyUrl)
+						{
+							layer.proxyURL = configData.proxyUrl;
+						}
+						if (useAMF)
+						{
+							layer.useAMF = useAMF == "true";
+						}
+						if (lyrFields && lyrFields[0].@all[0] == "true")
+						{
+							layer.outFields = [ "*" ];
+						}
+						else if (lyrFields)
+						{
+							var fields:XMLList = lyrFields.field;
+							layer.outFields = [];
+							for each (var fieldXML:XML in fields)
+							{
+								if (fieldXML.@name[0])
+								{
+									layer.outFields.push(fieldXML.@name[0]);
+								}
+							}
+						}
+						
+						var searchLayer:Object = 
+						{
+							layer: layer,
+							label: lyrLabel,
+							titlefield: lyrTitleField,
+							spatialsearchlabel: lyrSpatialLabel,
+							spatialsearchlayer: lyrSpatialSearchLyr,
+							graphicallabel: lyrGraphicalLabel,
+							expr: configLayerExprs,
+							fields: lyrFields,
+							linkpre: lyrLinkPre,
+							linkfield: lyrLinkField,
+							linksuffix: lyrLinkSuffix,
+							linkiconpre: lyrLinkIconPre,
+							linkicon: lyrLinkIcon,
+							linkiconisfield: lyrLinkIconIsField,
+							linkiconsuffix: lyrLinkIconSuffix,
+							multi: lyrMultiImgField,
+							zoomscale: zoomScale,
+							enableexport: lyrEnableExport,
+							defexpr: lyrDefExpr,
+							opendg: openDG
+						}
+						configSearchGraphical.push(searchLayer);
+						
+						if (searchLayer.spatialsearchlayer == "true"){
+							configSpatialSearchLayers.push(searchLayer);
+						}
+						
+						if (lyrExpr){
+							configSearchText.push(searchLayer);
+							if(i==0){
+								qLayer = new FeatureLayer(lyrURL);
+								if(configLayerExprs[0].usedomain)
+									popCBwithDomain(configLayerExprs[0].field);
+								else if(configLayerExprs[0].userlist != "")
+									popCBwithUserList(configLayerExprs[0].userlist);
+							}
+						}
+					}
+					
+					//marker symbol
+					if(configXML.symbols.picturemarkersymbol.@url[0] != null){
+						const resultMarkerSymbolURL:String = configXML.symbols.picturemarkersymbol.@url || widgetIcon;
+						const resultMarkerSymbolHeight:Number = (configXML.symbols.picturemarkersymbol.@height[0] != null) ? configXML.symbols.picturemarkersymbol.@height : 30;
+						const resultMarkerSymbolWidth:Number = (configXML.symbols.picturemarkersymbol.@width[0] != null) ? configXML.symbols.picturemarkersymbol.@width : 30;
+						const resultMarkerSymbolXOffset:Number = configXML.symbols.picturemarkersymbol.@xoffset || 0;
+						const resultMarkerSymbolYOffset:Number = configXML.symbols.picturemarkersymbol.@yoffset || 0;
+						resultMarkerSymbol = new PictureMarkerSymbol(resultMarkerSymbolURL, resultMarkerSymbolWidth, resultMarkerSymbolHeight, resultMarkerSymbolXOffset, resultMarkerSymbolYOffset);
+					}else{
+						const resultMarkerSymbolStyle:String = configXML.symbols.simplemarkersymbol.@style || "circle";
+						const resultMarkerSymbolSize:Number = (configXML.symbols.simplemarkersymbol.@size[0] != null) ? configXML.symbols.simplemarkersymbol.@size : 15;
+						const resultMarkerSymbolColor:uint = (configXML.symbols.simplemarkersymbol.@color[0] != null) ? configXML.symbols.simplemarkersymbol.@color : 0xFF0000;
+						const resultMarkerSymbolAlpha:Number = (configXML.symbols.simplemarkersymbol.@alpha[0] != null) ? configXML.symbols.simplemarkersymbol.@alpha : 0.8;
+						const resultMarkerSymbolXOffset2:Number = configXML.symbols.simplemarkersymbol.@xoffset || 0;
+						const resultMarkerSymbolYOffset2:Number = configXML.symbols.simplemarkersymbol.@yoffset || 0;
+						const resultMarkerSymbolAngle:Number = configXML.symbols.simplemarkersymbol.@angle || 0;
+						const resultMarkerSymbolOutlineStyle:String = configXML.symbols.simplemarkersymbol.outline.@style || "solid";
+						const resultMarkerSymbolOutlineColor:uint = (configXML.symbols.simplemarkersymbol.outline.@color[0] != null) ? configXML.symbols.simplemarkersymbol.outline.@color : 0x0000ff;
+						const resultMarkerSymbolOutlineAlpha:Number = (configXML.symbols.simplemarkersymbol.outline.@alpha[0] != null) ? configXML.symbols.simplemarkersymbol.outline.@alpha : 0.8;
+						const resultMarkerSymbolOutlineWidth:Number = (configXML.symbols.simplemarkersymbol.outline.@width[0] != null) ? configXML.symbols.simplemarkersymbol.outline.@width : 2;
+						resultMarkerSymbol = new SimpleMarkerSymbol(resultMarkerSymbolStyle,resultMarkerSymbolSize,resultMarkerSymbolColor,resultMarkerSymbolAlpha,resultMarkerSymbolXOffset2,resultMarkerSymbolYOffset2,resultMarkerSymbolAngle,new SimpleLineSymbol(resultMarkerSymbolOutlineStyle, resultMarkerSymbolOutlineColor, resultMarkerSymbolOutlineAlpha, resultMarkerSymbolOutlineWidth));
+					}
+					
+					//line symbol
+					const resultLineSymbolColor:uint = (configXML.symbols.simplelinesymbol.@color[0] != null) ? configXML.symbols.simplelinesymbol.@color : 0xFF0000;
+					const resultLineSymbolAlpha:Number = (configXML.symbols.simplelinesymbol.@alpha[0] != null) ? configXML.symbols.simplelinesymbol.@alpha : 0.8;
+					const resultLineSymbolWidth:Number = (configXML.symbols.simplelinesymbol.@width[0] != null) ? configXML.symbols.simplelinesymbol.@width : 2;
+					resultLineSymbol = new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, resultLineSymbolColor, resultLineSymbolAlpha, resultLineSymbolWidth);
+					
+					// fill symbol
+					const resultFillSymbolColor:uint = (configXML.symbols.simplefillsymbol.@color[0] != null) ? configXML.symbols.simplefillsymbol.@color : 0xFF0000;
+					const resultFillSymbolAlpha:Number = (configXML.symbols.simplefillsymbol.@alpha[0] != null) ? configXML.symbols.simplefillsymbol.@alpha : 0.5; 
+					const resultFillSymbolOutlineColor:uint = (configXML.symbols.simplefillsymbol.outline.@color[0] != null) ? configXML.symbols.simplefillsymbol.outline.@color : 0xFF0000;
+					const resultFillSymbolOutlineAlpha:Number = (configXML.symbols.simplefillsymbol.outline.@alpha[0] != null) ? configXML.symbols.simplefillsymbol.outline.@alpha : 0.8;
+					const resultFillSymbolOutlineWidth:Number = (configXML.symbols.simplefillsymbol.outline.@width[0] != null) ? configXML.symbols.simplefillsymbol.outline.@width : 2;
+					resultFillSymbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID, resultFillSymbolColor, resultFillSymbolAlpha, new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, resultFillSymbolOutlineColor, resultFillSymbolOutlineAlpha, resultFillSymbolOutlineWidth));
+					
+					graphicsLayerBuffer = new GraphicsLayer();
+					graphicsLayerBuffer.name = "Buffer Results";
+					map.addLayer(graphicsLayerBuffer);
+					
+					graphicsLayer = new GraphicsLayer();
+					graphicsLayer.name = "Search Results";
+					graphicsLayer.symbol = resultMarkerSymbol;
+					graphicsLayer.addEventListener(FlexEvent.HIDE, graphicsLayer_hideHandler);
+					map.addLayer(graphicsLayer);
+					
+					graGraphicsLayer = new GraphicsLayer();
+					graGraphicsLayer.name = "Graphical Search Layer";
+					map.addLayer(graGraphicsLayer);
+					
+					var userTolerance:Number = configXML.tolerance;
+					if (userTolerance > 0)
+					{
+						pointSearchTolerance = userTolerance;
+					}
+					if (selectedGraphicalTool != "" && defaultSelectionOption == "graphicalInput")
+						activateSearchTool(null, selectedGraphicalTool);
+				}
+				
+				if(disableButtons != "")
+					var dbArr:Array = disableButtons.split(",");
+				
+				var disText:Boolean = false;
+				var disGra:Boolean = false;
+				var disSpat:Boolean = false;
+				var disGrid:Boolean = false;
+				if(dbArr){
+					for (var d:int = 0; d<dbArr.length; d++)
+					{
+						switch (dbArr[d])
+						{
+							case "text":
+							{
+								disText = true;
+								break;
+							}
+							case "graphic":
+							{
+								disGra = true;
+								break;
+							}
+							case "spatial":
+							{
+								disSpat = true;
+								break;
+							}
+							case "grid":
+							{
+								disGrid = true;
+								break;
+							}
+						}
+					}
+				}
+				if(floatorfixed != "fixed")
+					wTemplate.addTitlebarButton(WIDGET_URL + "i_table2.png", gridresultsLabel,showGridResults,false);
+				if(!disGra)
+					wTemplate.addTitlebarButton(ICON_URL + "i_searchgraphical.png", graphicalsearchLabel, showStateGraphicalSearch);
+				if (configSearchText.length && disText != true)
+					wTemplate.addTitlebarButton(ICON_URL + "i_searchtext.png", textsearchLabel, showStateTextSearch);
+				if (configSpatialSearchLayers.length && disSpat != true)
+					wTemplate.addTitlebarButton(WIDGET_URL + "i_searchspatial.png", spatialsearchLabel, showStateSpatialSearch);
+				if(!disGrid)
+					wTemplate.addTitlebarButton(ICON_URL + "i_table.png", resultsLabel, showStateResults);
+				
+				//Setup Text Search
+				if (configSearchText.length)
+				{
+					cboLayerText.dataProvider = configSearchText;
+					txtLabelText.text = configSearchText[0].expr[0].textlabel;
+					if (configSearchText.length == 1)
+					{
+						boxText.visible = false;
+						boxText.includeInLayout = false;
+					}
+					cboLayerExpr.dataProvider = configSearchText[0].expr;
+					if (configSearchText[0].expr.length == 1)
+					{
+						boxTextexpr.visible = false;
+						boxTextexpr.includeInLayout = false;
+					}
+				}
+				else
+				{
+					boxText.visible = false;
+					txtLabelText.text = nolayerLabel;
+				}
+				
+				//Setup Graphical Search
+				if (configSearchGraphical.length)
+				{
+					cboLayerGraphical.dataProvider = configSearchGraphical;
+					txtLabelGraphical.text = configSearchText[0].graphicallabel;
+					if (configSearchGraphical.length == 1)
+					{
+						boxGraphical.visible = false;
+						boxGraphical.includeInLayout = false;
+					}
+				}
+				else
+				{
+					boxGraphical.visible = false;
+					txtLabelGraphical.text = nolayerLabel;
+				}
+				
+				if (configSpatialSearchLayers.length)
+				{
+					cboSearchLayerSpatial.dataProvider = configSpatialSearchLayers;
+					cboBufferUnit.dataProvider = configBufferUnits;
+				}
+				
+				//Determine which button to select based on the default selection option
+				for(var tb:int=0; tb < wTemplate.headerToolGroup.numElements; tb++)
+				{
+					var tbb:TitlebarButton = wTemplate.headerToolGroup.getElementAt(tb) as TitlebarButton;
+					if(tbb.toolTip == graphicalsearchLabel && defaultSelectionOption == "graphicalInput")
+						wTemplate.selectedTitlebarButtonIndex = tb;
+					if(tbb.toolTip == textsearchLabel && defaultSelectionOption == "textInput")
+						wTemplate.selectedTitlebarButtonIndex = tb;
+					if(tbb.toolTip == spatialsearchLabel && defaultSelectionOption == "spatialInput")
+						wTemplate.selectedTitlebarButtonIndex = tb;
+				}
+				
+				AppEvent.addListener(AppEvent.DATA_PUBLISH, sharedDataUpdated);
+				//If you want the floating datagrid to constantly appear in the bottom left corner uncomment the next line and there are 2 more comments like this
+				//map.addEventListener(ExtentEvent.EXTENT_CHANGE, mapResizeHandler);
+				
+				if(ViewerContainer.urlConfigParams.search != null){
+					callLater(queryFromURL,[ViewerContainer.urlConfigParams.search,ViewerContainer.urlConfigParams.slayer,ViewerContainer.urlConfigParams.exprnum]);
+				}
+				wTemplate.visible = true;
+			}
+			
+			private function checkForGL2(evt:Event):void
+			{
+				MapUtil.forEachMapLayer(map, function(layer:Layer):void
+				{
+					if(layer.name.toLowerCase() == "buffer results"){
+						drawGraphicsLayer = layer as GraphicsLayer;
+						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkDrawNumGras);
+						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkDrawNumGras);
+						drawGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkDrawNumGras);
+					}
+				});
+			}
+			
+			private function checkBufferNumGras(event:Event):void
+			{
+				clearMessage();
+				if(bufferGraphicsLayer){
+					pBufferBtn.filters = (bufferGraphicsLayer.numGraphics > 0)?[]:[cOver];
+					pBufferBtn.buttonMode = pBufferBtn.useHandCursor = pBufferBtn.enabled = (bufferGraphicsLayer.numGraphics > 0);
+				}
+			}
+
+//Added for URL Query			
+			public function queryFromURL(value:String, slayerId:int = 0, exprNum:int = 0):void
+			{
+				//hide infowindow if any
+				hideInfoWindow();
+				
+				var qFields:Array;
+				zoomScale = configSearchText[slayerId].zoomscale;
+				queryLayer = configSearchText[slayerId].layer;
+				queryExpr = configSearchText[slayerId].expr[exprNum].expression;
+				queryFields = configSearchText[slayerId].fields;
+				queryDefExpr = configSearchText[slayerId].defexpr;
+				
+				if (queryLayer && !queryLayer.loaded)
+				{
+					queryLayer.addEventListener(LayerEvent.LOAD, queryLayer_loadHandler);
+					function queryLayer_loadHandler(event:LayerEvent):void
+					{
+						queryFromURL(value, slayerId, exprNum);
+					}
+					return;
+				}
+				
+				var gfields:XMLList;
+				sumField = "";
+				gridFields = [];
+				gridHyperFields = [];
+				if (queryFields)
+				{
+					gfields = queryFields.field;
+					for each (var fieldXML:XML in gfields)
+					{
+						if (fieldXML.@gridfield[0])
+						{
+							if(fieldXML.@gridfield[0]=="true"){
+								if(fieldXML.@sum[0] && fieldXML.@sum[0] == "true"){
+									if(fieldXML.@sumlabel[0])
+										lblSum = fieldXML.@sumlabel[0];
+									sumField = fieldXML.@name[0];
+								}
+								var str:String = fieldXML.@name[0] + "~";
+								if(fieldXML.@alias[0]){
+									if(fieldXML.@alias[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@alias[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@dateformat[0]){
+									if(fieldXML.@dateformat[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@dateformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@currencyformat[0]){
+									if(fieldXML.@currencyformat[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@currencyformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@numberformat[0]){
+									if(fieldXML.@numberformat[0] == ""){
+										str += "NA";
+									}else{
+										str += fieldXML.@numberformat[0];
+									}
+								}else{
+									str += "NA";
+								}
+								gridFields.push(str);
+							}
+						}
+						if (fieldXML.@hyperlinkgridfield[0])
+						{
+							if (fieldXML.@hyperlinkgridfield[0]=="true"){
+								var str2:String = fieldXML.@name[0] + "~";
+								if(fieldXML.@alias[0]){
+									if(fieldXML.@alias[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@alias[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@hyperlinkaliastext[0]){
+									if(fieldXML.@hyperlinkaliastext[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@hyperlinkaliastext[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@linkprefix[0]){
+									if(fieldXML.@linkprefix[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@linkprefix[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@linksuffix[0]){
+									if(fieldXML.@linksuffix[0] == ""){
+										str2 += "NA";
+									}else{
+										str2 += fieldXML.@linksuffix[0];
+									}
+								}else{
+									str2 += "NA";
+								}
+								gridHyperFields.push(str2);
+							}
+						}
+					}
+				}
+				
+				queryTitleField = configSearchText[slayerId].titlefield;
+				queryLinkPre = configSearchText[slayerId].linkpre;
+				queryLinkField = configSearchText[slayerId].linkfield;
+				queryLinkSuffix = configSearchText[slayerId].linksuffix;
+				queryLinkIconPre = configSearchText[slayerId].linkiconpre;
+				queryLinkIcon = configSearchText[slayerId].linkicon;
+				queryLinkIconIsField = configSearchText[slayerId].linkiconisfield;
+				queryLinkIconSuffix = configSearchText[slayerId].linkiconsuffix;
+				queryMultiImgField = configSearchText[slayerId].multi;
+				queryEnableExport = configSearchText[slayerId].enableexport;
+				var fields:XMLList;
+				
+				if (queryLayer)
+				{
+					var query:Query = new Query();
+					var myPattern:RegExp = /\[value\]/g;
+					var expr:String;
+					expr = queryExpr.replace(myPattern, value); 
+					query.where = expr;
+					query.outSpatialReference = map.spatialReference;
+					if(queryDefExpr != "")
+						queryLayer.definitionExpression = queryDefExpr;
+					queryLayer.queryFeatures(query, new AsyncResponder(onResult, onFault, queryFields)); 
+					showMessage(loadingLabel, true); 
+					showStateResults();   
+					var gid:Number = 0;   
+					
+					// on result
+					function onResult(featureSet:FeatureSet, token:XMLList = null):void                 
+					{   
+						try
+						{
+							for each (var gra:Graphic in featureSet.features)                    
+							{   
+								var obj:Object = gra.attributes;
+								obj["gid"] = gid;
+								gid +=1;
+							}
+							gridDataProvider = featureSet.attributes;
+							resultsFeatureSet = featureSet;
+							searchResultAC = createSearchResults(featureSet, token);
+							// share data
+							addSharedData(widgetTitle, searchResultAC);
+							showMessage(selectionLabel + " " + featureSet.features.length, false);
+							map.cursorManager.removeBusyCursor();
+							if(featureSet.features.length > 1){
+								var geom:Geometry = unionGeoms(featureSet);
+								map.extent = geom.extent.expand(1.2);
+								if (!map.extent.contains(geom.extent.expand(1.2)))
+								{
+									map.level--;
+								}
+							}else{
+								var pt:MapPoint = searchResultAC[0].point;
+								if (map.scale > zoomScale)
+									map.scale = zoomScale;
+								map.centerAt(pt);
+							}
+							if(ViewerContainer.urlConfigParams.showdatagrid != null)
+								if(ViewerContainer.urlConfigParams.showdatagrid == "true")
+									showGridResults();
+						}
+						catch (error:Error)
+						{
+							showMessage(error.message, false);
+						}
+					}
+					//on fault
+					function onFault(info:Object, token:Object = null) : void
+					{      
+						showMessage(info.toString(), false);
+					}
+				}  
+			}
+//End Add	
+			private function sOpBtnClickHandler(event:Event):void
+			{
+				intersectResults(event.currentTarget.name);
+			}
+			
+			private function getSopImg(value:String):String
+			{
+				var retVal:String = ""
+				switch(value)
+				{
+					case "esriSpatialRelIntersects":
+					{
+						retVal = WIDGET_URL + "i_intersect.png";
+						break;
+					}
+					case "esriSpatialRelContains":
+					{
+						retVal = WIDGET_URL + "i_contain.png";
+						break;
+					}
+					case "esriSpatialRelCrosses":
+					{
+						retVal = WIDGET_URL + "i_crosses.png";
+						break;
+					}
+					case "esriSpatialRelEnvelopeIntersects":
+					{
+						retVal = WIDGET_URL + "i_envintersects.png";
+						break;
+					}
+					case "esriSpatialRelIndexIntersects":
+					{
+						retVal = WIDGET_URL + "i_index.png";
+						break;
+					}
+					case "esriSpatialRelOverlaps":
+					{
+						retVal = WIDGET_URL + "i_overlaps.png";
+						break;
+					}
+					case "esriSpatialRelTouches":
+					{
+						retVal = WIDGET_URL + "i_touches.png";
+						break;
+					}
+					case "esriSpatialRelWithin":
+					{
+						retVal = WIDGET_URL + "i_within.png";
+						break;
+					}
+				}
+				return retVal;
+			}			
+			
+			private function searchLayerChangedText():void
+			{
+				cbSearch.visible = false;
+				cbSearch.includeInLayout = false;
+				txtSearch.visible = true;
+				txtSearch.includeInLayout = true;
+				var i:Number = cboLayerText.selectedIndex;
+				if(configSearchText[i].expr[0].usedomain)
+					popCBwithDomain(configSearchText[i].expr[0].field);
+				else if(configSearchText[i].expr[0].userlist != "")
+					popCBwithUserList(configSearchText[i].expr[0].userlist);
+				txtLabelText.text = configSearchText[i].expr[0].textlabel;
+				cboLayerExpr.dataProvider = configSearchText[i].expr;
+				if (configSearchText[i].expr.length == 1)
+				{
+					boxTextexpr.visible = false;
+					boxTextexpr.includeInLayout = false;
+				}else{
+					boxTextexpr.visible = true;
+					boxTextexpr.includeInLayout = true;
+				}
+			}
+			
+			private function searchLayerExprChangedText():void
+			{
+				var i:Number = cboLayerText.selectedIndex;
+				var j:Number = cboLayerExpr.selectedIndex;
+				cbSearch.visible = false;
+				cbSearch.includeInLayout = false;
+				txtSearch.visible = true;
+				txtSearch.includeInLayout = true;
+				if(configSearchText[i].expr[j].usedomain)
+					popCBwithDomain(configSearchText[i].expr[j].field);
+				else if(configSearchText[i].expr[j].userlist != "")
+					popCBwithUserList(configSearchText[i].expr[j].userlist);
+				txtLabelText.text = configSearchText[i].expr[j].textlabel;
+			}
+			
+			private function searchLayerChangedGraphical():void
+			{
+				var i:Number = cboLayerGraphical.selectedIndex;
+				txtLabelGraphical.text = configSearchText[i].graphicallabel;
+			}
+			
+			private function activateSearchTool(event:MouseEvent, lTool:String = ""):void
+			{
+				addSharedData("Deactivate_DrawTool", null); // to be able to deactivate drawTool on other widgets
+				
+				if(event){
+					graGraphicsLayer.clear();
+					selectedDrawingIcon = Image(event.currentTarget);
+				}else{
+					switch(lTool){
+						case DrawTool.EXTENT :
+						{
+							selectedDrawingIcon = iSearchExt;
+							break;
+						}
+						case DrawTool.POLYGON :
+						{
+							selectedDrawingIcon = iSearchPoly;
+							break;
+						}
+						case DrawTool.MAPPOINT :
+						{
+							selectedDrawingIcon = iSearchPnt;
+							break;
+						}
+						case DrawTool.POLYLINE :
+						{
+							selectedDrawingIcon = iSearchLine;
+							break;
+						}
+						default:
+						{
+							selectedDrawingIcon = iSearchPnt;
+						}
+					}
+				}
+				clearSelectionFilter();
+				selectedDrawingIcon.filters = [ glowFilter ];
+				
+				var status:String;
+				var value:String = lastTool = selectedDrawingIcon.name;
+				switch (value)
+				{
+					case DrawTool.MAPPOINT:
+					{
+						status = pointLabel;
+						drawSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbol.STYLE_CIRCLE, 15, 0x3FAFDC, 1);
+						break;
+					}
+					case DrawTool.POLYLINE:
+					{
+						status = lineLabel;
+						drawSymbol = new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, 0x3FAFDC, 1, 1);
+						break;
+					}
+					case DrawTool.EXTENT:
+					{
+						status = rectangleLabel;
+						drawSymbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID, 0x3FAFDC, 0.5, new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, 0x3FAFDC, 1, 1));
+						break;
+					}
+					case DrawTool.POLYGON:
+					{
+						status = polygonLabel;
+						drawSymbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID, 0x3FAFDC, 0.5, new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, 0x3FAFDC, 1, 1));
+						break;
+					}
+				}
+				setMapAction(value, status, drawSymbol, searchDrawEnd);
+			}			
+			
+			private function searchDrawEnd(event:DrawEvent):void
+			{
+				activateSearchTool(null,lastTool);
+				var geom:Geometry = event.graphic.geometry;
+				var graGraphic:Graphic = new Graphic(geom, drawSymbol);
+				graGraphicsLayer.add(graGraphic);
+				if(!graMultiChk.selected){
+					queryFeaturesGra();
+				}
+			}
+			
+			private function graMultiChanged():void
+			{
+				(graMultiChk.selected) ? graFeatureQueryBtn.visible = true : graFeatureQueryBtn.visible = false;
+			}
+			
+			private function unionGeoms2(gl:GraphicsLayer):Geometry
+			{
+				var retGeom:Geometry;
+				var mPoint:Multipoint = new Multipoint(null);
+				mPoint.spatialReference = map.spatialReference;
+				var mPoly:Polygon = new Polygon(null);
+				mPoly.spatialReference = map.spatialReference;
+				var mPolyL:Polyline = new Polyline(null);
+				mPolyL.spatialReference = map.spatialReference;
+				var rType:String;
+				for each (var graphic:Graphic in gl.graphicProvider)
+				{
+					if(graphic.geometry.type == "esriGeometryPoint" && !addTolerance.selected)
+					{
+						mPoint.addPoint(graphic.geometry as MapPoint);
+						rType = "point";
+					}else if (graphic.geometry.type == "esriGeometryPoint" && addTolerance.selected){
+						var ext2:Extent = createExtentAroundMapPoint(graphic.geometry as MapPoint, pointSearchTolerance) as Extent;
+						var pA2:Array = [];
+						pA2.push(new MapPoint(ext2.xmin,ext2.ymin,ext2.spatialReference));
+						pA2.push(new MapPoint(ext2.xmin,ext2.ymax,ext2.spatialReference));
+						pA2.push(new MapPoint(ext2.xmax,ext2.ymax,ext2.spatialReference));
+						pA2.push(new MapPoint(ext2.xmax,ext2.ymin,ext2.spatialReference));
+						pA2.push(new MapPoint(ext2.xmin,ext2.ymin,ext2.spatialReference));
+						mPoly.addRing(pA2);
+						rType = "poly";
+						mPoly.spatialReference = ext2.spatialReference;
+					}
+					
+					if(graphic.geometry.type == "esriGeometryMultipoint")
+					{
+						var mp:Multipoint = graphic.geometry as Multipoint
+						var pnts:MapPoint;
+						for (var p:int=0;p < mp.points.length; p++)
+						{
+							mPoint.addPoint(mp.points[p]);
+						}
+						rType = "point";
+					}
+					
+					if(graphic.geometry.type == "esriGeometryPolygon")
+					{
+						var poly:Polygon = graphic.geometry as Polygon;
+						for (var i2:int = poly.rings.length - 1; i2 >= 0; i2--)
+						{
+							var ringArray:Array = [];
+							for (var j1:int = 0; j1 < poly.rings[i2].length; j1++)
+							{
+								var mp2:MapPoint = poly.getPoint(i2,j1) as MapPoint;
+								mp2.spatialReference = poly.spatialReference;
+								ringArray.push(mp2);
+							}
+							mPoly.addRing(ringArray);
+						}
+						rType = "poly";
+						mPoly.spatialReference = poly.spatialReference;
+					}
+					
+					if(graphic.geometry.type == "esriGeometryPolyline")
+					{
+						var polyl:Polyline = graphic.geometry as Polyline;
+						for(var l:int=polyl.paths.length-1; l >= 0; l--)
+						{
+							var pathArray:Array = [];
+							for (var j2:int = 0; j2 < polyl.paths[l].length; j2++)
+							{
+								var mp3:MapPoint = polyl.getPoint(l,j2) as MapPoint;
+								mp3.spatialReference = polyl.spatialReference;
+								pathArray.push(mp3);
+							}
+							mPolyL.addPath(pathArray);
+						}
+						rType = "line";
+					}
+					
+					if(graphic.geometry.type == "esriGeometryEnvelope")
+					{
+						var ext:Extent = graphic.geometry as Extent;
+						var pA:Array = [];
+						pA.push(new MapPoint(ext.xmin,ext.ymin,ext.spatialReference));
+						pA.push(new MapPoint(ext.xmin,ext.ymax,ext.spatialReference));
+						pA.push(new MapPoint(ext.xmax,ext.ymax,ext.spatialReference));
+						pA.push(new MapPoint(ext.xmax,ext.ymin,ext.spatialReference));
+						pA.push(new MapPoint(ext.xmin,ext.ymin,ext.spatialReference));
+						mPoly.addRing(pA);
+						rType = "poly";
+					}
+				}
+				
+				switch(rType){
+					case "point":
+					{
+						retGeom = mPoint;
+						break;
+					}
+					case "poly":
+					{
+						retGeom = mPoly;
+						break;
+					}
+					case "line":
+					{
+						retGeom = mPolyL;
+						break;
+					}
+				}
+				return retGeom;
+			}
+			
+			private function queryFeaturesGra():void
+			{
+				var geom:Geometry
+				var graLayAC:ArrayCollection = graGraphicsLayer.graphicProvider as ArrayCollection;
+				if (graLayAC.length > 1)
+					 geom = unionGeoms2(graGraphicsLayer);
+				else if (graLayAC.length == 1)
+					geom = (graLayAC[0] as Graphic).geometry;
+				else
+					return;
+				
+				selectedDrawingIcon = null;
+				clearSelectionFilter();
+				clearBuffer();
+				if (geom is Polygon && GeometryUtil.polygonSelfIntersecting(geom as Polygon))
+				{
+					geometryService.simplify([geom], new AsyncResponder(simpResult, null));
+					function simpResult(item:Object ,spatialRelat:String):void{
+						var simpGeoms:Array = item as Array;
+						queryFeaturesGraphical(simpGeoms[0] as Polygon, "esriSpatialRelIntersects", configSearchGraphical[cboLayerGraphical.selectedIndex]);
+					}
+				}else{
+					//create extent around map point to improve search results
+					if (geom.type == Geometry.MAPPOINT && addTolerance.selected)
+					{
+						geom = createExtentAroundMapPoint(geom as MapPoint, pointSearchTolerance);
+					}
+					queryFeaturesGraphical(geom, "esriSpatialRelIntersects", configSearchGraphical[cboLayerGraphical.selectedIndex]);
+				}
+				graGraphicsLayer.clear();
+			}
+			
+			private function createExtentAroundMapPoint(centerPoint:MapPoint, tolerance:Number):Extent
+			{
+				var screenPoint:Point = map.toScreen(centerPoint as MapPoint);
+				
+				var upperLeftScreenPoint:Point = new Point(screenPoint.x - tolerance, screenPoint.y - tolerance);
+				var lowerRightScreenPoint:Point = new Point(screenPoint.x + tolerance, screenPoint.y + tolerance);
+				
+				var upperLeftMapPoint:MapPoint = map.toMap(upperLeftScreenPoint);
+				var lowerRightMapPoint:MapPoint = map.toMap(lowerRightScreenPoint);
+				
+				return new Extent(upperLeftMapPoint.x, upperLeftMapPoint.y, lowerRightMapPoint.x, lowerRightMapPoint.y, map.spatialReference);
+			}
+			
+			//query features text
+			private function queryFeaturesText():void
+			{
+				//hide infowindow if any
+				hideInfoWindow();
+				
+				var i:int = cboLayerText.selectedIndex;
+				queryLayer = configSearchText[i].layer;
+				
+				if (queryLayer && !queryLayer.loaded)
+				{
+					queryLayer.addEventListener(LayerEvent.LOAD, queryLayer_loadHandler);
+					function queryLayer_loadHandler(event:LayerEvent):void
+					{
+						queryFeaturesText()
+					}
+					return;
+				}
+				
+				var qFields:Array;
+				zoomScale = configSearchText[i].zoomscale;
+				queryLayer = configSearchText[i].layer;
+				var j:Number = cboLayerExpr.selectedIndex;
+				queryExpr = configSearchText[i].expr[j].expression;
+				queryFields = configSearchText[i].fields;
+				queryDefExpr = configSearchText[i].defexpr;
+				var gfields:XMLList;
+				sumField = "";
+				gridFields = [];
+				gridHyperFields = [];
+				if (queryFields)
+				{
+					gfields = queryFields.field;
+					for each (var fieldXML:XML in gfields)
+					{
+						if (fieldXML.@gridfield[0])
+						{
+							if(fieldXML.@gridfield[0]=="true"){
+								if(fieldXML.@sum[0] && fieldXML.@sum[0] == "true"){
+									if(fieldXML.@sumlabel[0])
+										lblSum = fieldXML.@sumlabel[0];
+									sumField = fieldXML.@name[0];
+								}
+								var str:String = fieldXML.@name[0] + "~";
+								if(fieldXML.@alias[0]){
+									if(fieldXML.@alias[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@alias[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@dateformat[0]){
+									if(fieldXML.@dateformat[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@dateformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@currencyformat[0]){
+									if(fieldXML.@currencyformat[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@currencyformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@numberformat[0]){
+									if(fieldXML.@numberformat[0] == ""){
+										str += "NA";
+									}else{
+										str += fieldXML.@numberformat[0];
+									}
+								}else{
+									str += "NA";
+								}
+								gridFields.push(str);
+							}
+						}
+						if (fieldXML.@hyperlinkgridfield[0])
+						{
+							if (fieldXML.@hyperlinkgridfield[0]=="true"){
+								var str2:String = fieldXML.@name[0] + "~";
+								if(fieldXML.@alias[0]){
+									if(fieldXML.@alias[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@alias[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@hyperlinkaliastext[0]){
+									if(fieldXML.@hyperlinkaliastext[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@hyperlinkaliastext[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@linkprefix[0]){
+									if(fieldXML.@linkprefix[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@linkprefix[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@linksuffix[0]){
+									if(fieldXML.@linksuffix[0] == ""){
+										str2 += "NA";
+									}else{
+										str2 += fieldXML.@linksuffix[0];
+									}
+								}else{
+									str2 += "NA";
+								}
+								gridHyperFields.push(str2);
+							}
+						}
+					}
+				}
+				
+				queryTitleField = configSearchText[i].titlefield;
+				queryLinkPre = configSearchText[i].linkpre;
+				queryLinkField = configSearchText[i].linkfield;
+				queryLinkSuffix = configSearchText[i].linksuffix;
+				queryLinkIconPre = configSearchText[i].linkiconpre;
+				queryLinkIcon = configSearchText[i].linkicon;
+				queryLinkIconIsField = configSearchText[i].linkiconisfield;
+				queryLinkIconSuffix = configSearchText[i].linkiconsuffix;
+				queryMultiImgField = configSearchText[i].multi;
+				queryEnableExport = configSearchText[i].enableexport;
+				openDataGrid = configSearchText[i].opendg;
+
+				var fields:XMLList;
+				if ((queryLayer) && (txtSearch.text || cbSearch.text))
+				{
+					var query:Query = new Query();
+					var myPattern:RegExp = /\[value\]/g;
+					var expr:String;
+					if (txtSearch.visible){
+						expr = queryExpr.replace(myPattern, txtSearch.text); 
+					}else{
+						expr = queryExpr.replace(myPattern, cbSearch.selectedItem.value); 
+					}
+					query.where = expr;
+					query.outSpatialReference = map.spatialReference;
+					if(queryDefExpr != "")
+						queryLayer.definitionExpression = queryDefExpr; 
+					queryLayer.queryFeatures(query, new AsyncResponder(onResult, onFault, queryFields));
+					showMessage(loadingLabel, true); 
+					showStateResults();   
+					var gid:Number = 0;
+					// on result
+					function onResult(featureSet:FeatureSet, token:XMLList = null):void                
+					{   
+						try
+						{ 
+							for each (var gra:Graphic in featureSet.features)                    
+							{   
+								var obj:Object = gra.attributes;
+								obj["gid"] = gid;
+								gid +=1;
+							}
+							gridDataProvider = featureSet.attributes;
+							resultsFeatureSet = featureSet;
+							searchResultAC = createSearchResults(featureSet, token);
+							// share data
+							addSharedData(widgetTitle, searchResultAC);
+							showMessage(selectionLabel + " " + featureSet.features.length, false);
+							if(floatorfixed == "float"){
+								if (myfloatdg){
+									if(myfloatdg.datagrid.dataProvider)
+										myfloatdg.datagrid.dataProvider.removeAll();
+									myfloatdg.csvExportOptionLbl = exp2csvOptLbl;
+									myfloatdg.txtExportOptionLbl = exp2txtOptLbl;
+									myfloatdg.ExportButtonLbl = expBtnLbl;
+									myfloatdg.csvSeperator = csvSep;
+									myfloatdg.dgFieldAliases = fldAliases;
+									myfloatdg.csvName = _csvName;
+									myfloatdg.sumField = sumField;
+									myfloatdg.labelSum = lblSum;
+									myfloatdg.dgColumns = gridFields;
+									myfloatdg.dgHyperColumns = gridHyperFields;
+									myfloatdg.dProvider = gridDataProvider;
+									myfloatdg.graphicslayer = graphicsLayer;
+									myfloatdg.zoomScale = zoomScale;
+									myfloatdg.ownerWidget = sWidget;
+									myfloatdg.layerDetails = queryLayer.layerDetails;
+									myfloatdg.enableExport = queryEnableExport;
+								}
+							}else if(floatorfixed == "fixed"){
+								if(!gridFields)
+									gridFields = configSearchText[i].gridfields;
+								var dgCongig:Object = {
+									widgetTitle: widgetTitle,
+									csvExportOptionLbl: exp2csvOptLbl,
+									txtExportOptionLbl: exp2txtOptLbl,
+									ExportButtonLbl: expBtnLbl,
+									csvSeperator: csvSep,
+									dgFieldAliases: fldAliases,
+									csvName: _csvName,
+									sumField: sumField,
+									labelSum: lblSum,
+									dgColumns: gridFields,
+									dgHyperColumns: gridHyperFields,
+									dProvider: gridDataProvider,
+									graphicslayer: graphicsLayer,
+									zoomScale: zoomScale,
+									ownerWidget: sWidget,
+									layerDetails: queryLayer.layerDetails,
+									enableExport: queryEnableExport
+								}
+								var dgconfigArr:ArrayCollection = new ArrayCollection();
+								dgconfigArr.addItem(dgCongig);
+								addSharedData("configFixedDatagrid", dgconfigArr);
+							}
+							
+							if (openDataGrid && floatorfixed != "fixed")
+								showGridResults(); 
+						}
+						catch (error:Error)
+						{
+							showMessage(error.message, false);
+						}
+					}
+					
+					//on fault
+					function onFault(info:Object, token:Object = null) : void
+					{                    
+						showMessage(info.toString(), false);         
+					}
+				}  
+			}				
+			
+			//query features graphical
+			private function queryFeaturesGraphical(geom:Geometry, querySpatialRel:String, layerConfig:Object):void
+			{
+				//hide infowindow if any
+				hideInfoWindow();
+				
+				var qFields:Array;
+				queryLayer = layerConfig.layer;
+				queryGeom = geom;
+				zoomScale = layerConfig.zoomscale;
+				queryFields = layerConfig.fields;
+				queryExpr = layerConfig.expr;
+				var gfields:XMLList;
+				gridFields = [];
+				gridHyperFields = [];
+				sumField = "";
+				if (queryFields)
+				{
+					gfields = queryFields.field;
+					for each (var fieldXML:XML in gfields)
+					{
+						if (fieldXML.@gridfield[0])
+						{
+							if(fieldXML.@gridfield[0]=="true"){
+								if(fieldXML.@sum[0] && fieldXML.@sum[0] == "true"){
+									if(fieldXML.@sumlabel[0])
+										lblSum = fieldXML.@sumlabel[0];
+									sumField = fieldXML.@name[0];
+								}
+								var str:String = fieldXML.@name[0] + "~";
+								if(fieldXML.@alias[0]){
+									if(fieldXML.@alias[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@alias[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@dateformat[0]){
+									if(fieldXML.@dateformat[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@dateformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@currencyformat[0]){
+									if(fieldXML.@currencyformat[0] == ""){
+										str += "NA~";
+									}else{
+										str += fieldXML.@currencyformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@numberformat[0]){
+									if(fieldXML.@numberformat[0] == ""){
+										str += "NA";
+									}else{
+										str += fieldXML.@numberformat[0];
+									}
+								}else{
+									str += "NA";
+								}
+								gridFields.push(str);
+							}
+						}
+						if (fieldXML.@hyperlinkgridfield[0])
+						{
+							if (fieldXML.@hyperlinkgridfield[0]=="true"){
+								var str2:String = fieldXML.@name[0] + "~";
+								if(fieldXML.@alias[0]){
+									if(fieldXML.@alias[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@alias[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@hyperlinkaliastext[0]){
+									if(fieldXML.@hyperlinkaliastext[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@hyperlinkaliastext[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@linkprefix[0]){
+									if(fieldXML.@linkprefix[0] == ""){
+										str2 += "NA~";
+									}else{
+										str2 += fieldXML.@linkprefix[0] + "~";
+									}
+								}else{
+									str2 += "NA~";
+								}
+								if(fieldXML.@linksuffix[0]){
+									if(fieldXML.@linksuffix[0] == ""){
+										str2 += "NA";
+									}else{
+										str2 += fieldXML.@linksuffix[0];
+									}
+								}else{
+									str2 += "NA";
+								}
+								gridHyperFields.push(str2);
+							}
+						}
+					}
+				}
+				queryTitleField = layerConfig.titlefield;
+				queryLinkPre = layerConfig.linkpre;
+				queryLinkField = layerConfig.linkfield;
+				queryLinkSuffix = layerConfig.linksuffix;
+				queryLinkIconPre = layerConfig.linkiconpre;
+				queryLinkIcon = layerConfig.linkicon;
+				queryLinkIconSuffix = layerConfig.linkiconsuffix;
+				queryLinkIconIsField = layerConfig.linkiconisfield;
+				queryMultiImgField = layerConfig.multi;
+				queryExprForSpatRel = layerConfig.useforspatial;
+				queryEnableExport = layerConfig.enableexport;
+				queryDefExpr = layerConfig.defexpr;
+				openDataGrid = layerConfig.opendg;
+				
+				var fields:XMLList;
+				if (queryLayer)
+				{
+					var query:Query = new Query();
+					query.geometry = queryGeom;
+					query.returnGeometry = true;
+					query.spatialRelationship = querySpatialRel;
+					query.outSpatialReference = map.spatialReference;
+					if(queryDefExpr != "")
+						queryLayer.definitionExpression = queryDefExpr;
+					queryLayer.queryFeatures(query, new AsyncResponder(onResult, onFault, queryFields));
+					showMessage(loadingLabel, true); 
+					showStateResults();   
+					var gid:Number = 0;
+					// on result
+					function onResult(featureSet:FeatureSet, token:XMLList = null):void
+					{   
+						try
+						{
+							for each (var gra:Graphic in featureSet.features)                    
+							{   
+								var obj:Object = gra.attributes;
+								obj["gid"] = gid;
+								gid +=1;
+							}
+							gridDataProvider = featureSet.attributes;
+							resultsFeatureSet = featureSet;
+							searchResultAC = createSearchResults(featureSet, token);
+							//addSharedData(widgetTitle, searchResultAC);
+							showMessage(selectionLabel + " " + featureSet.features.length, false);
+							if(floatorfixed == "float"){
+								if (myfloatdg){
+									if(myfloatdg.datagrid.dataProvider)
+										myfloatdg.datagrid.dataProvider.removeAll();
+									myfloatdg.csvExportOptionLbl = exp2csvOptLbl;
+									myfloatdg.txtExportOptionLbl = exp2txtOptLbl;
+									myfloatdg.ExportButtonLbl = expBtnLbl;
+									myfloatdg.csvSeperator = csvSep;
+									myfloatdg.dgFieldAliases = fldAliases;
+									myfloatdg.csvName = _csvName;
+									myfloatdg.sumField = sumField;
+									myfloatdg.labelSum = lblSum;
+									myfloatdg.dgColumns = gridFields;
+									myfloatdg.dgHyperColumns = gridHyperFields;
+									myfloatdg.dProvider = gridDataProvider;
+									myfloatdg.graphicslayer = graphicsLayer;
+									myfloatdg.zoomScale = zoomScale;
+									myfloatdg.ownerWidget = sWidget;
+									myfloatdg.layerDetails = queryLayer.layerDetails;
+									myfloatdg.enableExport = queryEnableExport;
+								}
+								if (openDataGrid && floatorfixed != "fixed" )
+									showGridResults();
+							}else if(floatorfixed == "fixed"){
+								var dgCongig:Object = {
+									widgetTitle: widgetTitle,
+									csvExportOptionLbl: exp2csvOptLbl,
+									txtExportOptionLbl: exp2txtOptLbl,
+									ExportButtonLbl: expBtnLbl,
+									csvSeperator: csvSep,
+									dgFieldAliases: fldAliases,
+									csvName: _csvName,
+									sumField: sumField,
+									labelSum: lblSum,
+									dgColumns: gridFields,
+									dgHyperColumns: gridHyperFields,
+									dProvider: gridDataProvider,
+									graphicslayer: graphicsLayer,
+									zoomScale: zoomScale,
+									ownerWidget: sWidget,
+									layerDetails: queryLayer.layerDetails,
+									enableExport: queryEnableExport
+								}
+								var dgconfigArr:ArrayCollection = new ArrayCollection();
+								dgconfigArr.addItem(dgCongig);
+								addSharedData("configFixedDatagrid", dgconfigArr);
+							}
+						}
+						catch (error:Error)
+						{
+							showMessage(error.message, false);
+						}	
+					}
+					
+					//on fault
+					function onFault(info:Object, token:Object = null) : void
+					{                    
+						showMessage(info.toString(), false);         
+					}
+				}  
+			}
+			
+			private function unionGeoms(featureSet:FeatureSet):Geometry
+			{
+				var graphic:Graphic;
+				var retGeom:Geometry;
+				var mPoint:Multipoint = new Multipoint(null);
+				var mPoly:Polygon = new Polygon(null);
+				var mPolyL:Polyline = new Polyline(null);
+				var rType:String;
+				for each (graphic in featureSet.features)
+				{
+					if(graphic.geometry.type == "esriGeometryPoint")
+					{
+						mPoint.addPoint(graphic.geometry as MapPoint);
+						rType = "point";
+					}
+					
+					if(graphic.geometry.type == "esriGeometryMultipoint")
+					{
+						var mp:Multipoint = graphic.geometry as Multipoint
+						var pnts:MapPoint;
+						for (var p:int=0;p < mp.points.length; p++)
+						{
+							mPoint.addPoint(mp.points[p]);
+						}
+						rType = "point";
+					}
+					
+					if(graphic.geometry.type == "esriGeometryPolygon")
+					{
+						var poly:Polygon = graphic.geometry as Polygon;
+						for (var i2:int = poly.rings.length - 1; i2 >= 0; i2--)
+						{
+							var ringArray:Array = [];
+							for (var j1:int = 0; j1 < poly.rings[i2].length; j1++)
+							{
+								var mp2:MapPoint = poly.getPoint(i2,j1) as MapPoint;
+								mp2.spatialReference = poly.spatialReference;
+								ringArray.push(mp2);
+							}
+							mPoly.addRing(ringArray);
+						}
+						rType = "poly";
+						mPoly.spatialReference = poly.spatialReference;
+					}
+					
+					if(graphic.geometry.type == "esriGeometryPolyline")
+					{
+						var polyl:Polyline = graphic.geometry as Polyline;
+						for(var l:int=polyl.paths.length-1; l >= 0; l--)
+						{
+							var pathArray:Array = [];
+							for (var j2:int = 0; j2 < polyl.paths[l].length; j2++)
+							{
+								var mp3:MapPoint = polyl.getPoint(l,j2) as MapPoint;
+								mp3.spatialReference = polyl.spatialReference;
+								pathArray.push(mp3);
+							}
+							mPolyL.addPath(pathArray);
+						}
+						rType = "line";
+					}
+					
+					if(graphic.geometry.type == "esriGeometryEnvelope")
+					{
+						var ext:Extent = graphic.geometry as Extent;
+						var pA:Array = [];
+						pA.push(new MapPoint(ext.xmin,ext.ymin,ext.spatialReference));
+						pA.push(new MapPoint(ext.xmin,ext.ymax,ext.spatialReference));
+						pA.push(new MapPoint(ext.xmax,ext.ymax,ext.spatialReference));
+						pA.push(new MapPoint(ext.xmax,ext.ymin,ext.spatialReference));
+						pA.push(new MapPoint(ext.xmin,ext.ymin,ext.spatialReference));
+						mPoly.addRing(pA);
+						rType = "poly";
+					}
+				}
+				var graphic2:Graphic = new Graphic();
+				var sfs:SimpleFillSymbol = new SimpleFillSymbol();
+				sfs.color = 0x0000FF;
+				sfs.alpha = 0.2;
+				var sms:SimpleMarkerSymbol = new SimpleMarkerSymbol();
+				sms.color = 0x0000FF;
+				sms.style = SimpleMarkerSymbol.STYLE_CIRCLE;
+				sms.size = 8;
+				sfs.alpha = 0.4;
+				var sls:SimpleLineSymbol = new SimpleLineSymbol();
+				sls.color = 0x0000FF;
+				sls.style = SimpleLineSymbol.STYLE_SOLID;
+				sls.width = 1;
+				sls.alpha = 0.4;
+				
+				switch(rType){
+					case "point":
+					{
+						graphic2.geometry = mPoint;
+						graphic2.symbol = sms;
+						graphicsLayerBuffer.clear();
+						graphicsLayerBuffer.add(graphic2);
+						retGeom = mPoint;
+						break;
+					}
+					case "poly":
+					{
+						graphic2.geometry = mPoly;
+						graphic2.symbol = sfs;
+						graphicsLayerBuffer.clear();
+						graphicsLayerBuffer.add(graphic2);
+						retGeom = mPoly;
+						break;
+					}
+					case "line":
+					{
+						graphic2.geometry = mPolyL;
+						graphic2.symbol = sls;
+						graphicsLayerBuffer.clear();
+						graphicsLayerBuffer.add(graphic2);
+						retGeom = mPolyL;
+						break;
+					}
+				}
+				return retGeom;
+			}
+			
+			private function applyBuffer():void
+			{
+				var graLayAC:ArrayCollection = graphicsLayer.graphicProvider as ArrayCollection;
+				if (graLayAC.length > 0) 
+				{
+					geomArr = [];
+					for each (var graphic:Graphic in graphicsLayer.graphicProvider)
+					{
+						geomArr.push(graphic.geometry);
+					}
+					var buffUnit:Number = GeometryService[configBufferUnits[cboBufferUnit.selectedIndex].name];
+					bufferGeometries(geomArr,sReff,[textInputBuffer.text],buffUnit);
+				} else {
+					showStateResults();
+					showMessage("There is no result to buffer, please make a graphical or text search first.",false);
+				}
+			}
+			
+			private function bufferGeometries(geomArr:Array, sr:SpatialReference, dist:Array, unit:Number):void
+			{
+				if (geomArr)
+				{
+					var bufferParameters:BufferParameters = new BufferParameters();
+					var resultEvent:Polygon = new Polygon;
+					bufferParameters.geometries = geomArr;
+					bufferParameters.bufferSpatialReference = sr;
+					bufferParameters.unit = unit;
+					bufferParameters.distances = dist;
+					bufferParameters.unionResults = true;
+					geometryService.addEventListener(GeometryServiceEvent.BUFFER_COMPLETE, bufferCompleteHandler);
+					geometryService.buffer(bufferParameters);
+					
+					function bufferCompleteHandler(event:GeometryServiceEvent):void
+					{
+						geometryService.removeEventListener(GeometryServiceEvent.BUFFER_COMPLETE, bufferCompleteHandler);
+						resultEvent = event.result[0];
+						try
+						{
+							var graphic:Graphic = new Graphic();
+							var sfs:SimpleFillSymbol = new SimpleFillSymbol();
+							sfs.color = cpBufferColor.selectedColor;//0x0000FF;
+							sfs.alpha = hsBufferAlpha.value;//0.2;
+							graphic.geometry = resultEvent;
+							graphic.symbol = sfs;
+							
+							graphicsLayerBuffer.clear();
+							graphicsLayerBuffer.add(graphic);							
+						}
+						catch (error:Error)
+						{
+							showMessage(error.message, false);
+						}
+					}					
+					
+				}
+				
+			}
+			
+			private function intersectResults(spatialRelat:String):void
+			{
+				geomArr = [];
+				var graLayBufferAC:ArrayCollection = graphicsLayerBuffer.graphicProvider as ArrayCollection;
+				var graLayAC:ArrayCollection = graphicsLayer.graphicProvider as ArrayCollection;
+				var intersectGeom:Geometry;
+				if (graLayBufferAC.length >0){
+					var gra:Graphic = graLayBufferAC[0] as Graphic;
+					intersectGeom =  gra.geometry;
+					queryFeaturesGraphical(intersectGeom, spatialRelat,configSpatialSearchLayers[cboSearchLayerSpatial.selectedIndex]);
+				} else if (graLayAC.length >0) {
+					intersectGeom = unionGeoms(resultsFeatureSet);
+					if (GeometryUtil.polygonSelfIntersecting(intersectGeom as Polygon)){
+						geometryService.simplify([intersectGeom], new AsyncResponder(simpResult, null, spatialRelat));
+						function simpResult(item:Object ,spatialRelat:String):void{
+							var simpGeoms:Array = item as Array;
+							queryFeaturesGraphical(simpGeoms[0] as Polygon, spatialRelat,configSpatialSearchLayers[cboSearchLayerSpatial.selectedIndex]);
+						}
+					}else{
+						queryFeaturesGraphical(intersectGeom, spatialRelat,configSpatialSearchLayers[cboSearchLayerSpatial.selectedIndex]);
+					}					
+				} else {
+					showStateResults();
+					showMessage("There is no result to intersect, please make a graphical or text search first.",false);
+				}
+			}
+			
+			//create Search Results
+			private function createSearchResults(featureSet:FeatureSet, queryFields:XMLList):ArrayCollection
+			{
+				graphicsLayer.clear();
+				layerDetails = queryLayer.layerDetails;
+				var fields:XMLList = queryFields ? queryFields.field : null;
+				
+				var result:ArrayCollection = new ArrayCollection();
+				if (!queryTitleField)
+					queryTitleField = featureSet.displayFieldName;
+				var gid:Number = 0;
+				
+				for each (var graphic:Graphic in featureSet.features)
+				{
+					//if(graphic.geometry) continue;
+					var value:String = "";
+					var title:String = "";
+					var content:String = "";
+					var link:String = "";
+					var multi:String = "";
+					var linkicon:String = "";
+					
+					fldAliases = featureSet.fieldAliases;
+					
+					if (queryFields && queryFields[0].@all[0] == "true")
+					{
+						if (layerDetails.fields)
+						{
+							for each (var field:Field in layerDetails.fields)
+							{
+								if (field.name in graphic.attributes)
+								{
+									displayFields(field.name, getFieldXML(field.name, fields), field);
+								}
+							}
+						}
+						else
+						{
+							for (var fieldName:String in graphic.attributes)
+							{
+								displayFields(fieldName, getFieldXML(fieldName, fields), null);
+							}
+						}
+					}else{
+						for each (var fieldXML:XML in fields) // display the fields in the same order as specified
+						{
+							if (fieldXML.@name[0] in graphic.attributes)
+							{
+								displayFields(fieldXML.@name[0], fieldXML, getField(fieldXML.@name[0]));
+							}
+						}
+					}
+					
+					function displayFields(fieldName:String, fieldXML:XML, field:Field):void
+					{
+						value = graphic.attributes[fieldName] ? String(graphic.attributes[fieldName]) : "";
+						
+						if (value)
+						{
+							var isDateField:Boolean;
+							var dateFormat:String;
+							var numFormat:String;
+							var curFormat:String;
+							var useUTC:Boolean;
+							if (fieldXML)
+							{
+								numFormat = fieldXML.@numberformat[0];
+								curFormat = fieldXML.@currencyformat[0];
+								useUTC = fieldXML.@useutc[0] == "true";
+								dateFormat = fieldXML.@dateformat[0];
+								if (dateFormat)
+								{
+									isDateField = true;
+								}
+							}
+							if (!isDateField && field)
+							{
+								isDateField = field.type == Field.TYPE_DATE;
+							}
+							if (isDateField)
+							{
+								var dateMS:Number = Number(value);
+								if (!isNaN(dateMS))
+								{
+									value = msToDate(dateMS, dateFormat, useUTC);
+								}
+							}
+							
+							if(numFormat)
+							{
+								var args:Array = numFormat.split("|");
+								if(args[0])
+									numFormatter.precision = args[0];
+								if(args[1]){
+									numFormatter.thousandsSeparatorFrom = args[1];
+									numFormatter.thousandsSeparatorTo = args[1];
+								}else{
+									numFormatter.useThousandsSeparator = false;
+								}
+								if(args[2]){
+									numFormatter.decimalSeparatorFrom = args[2];
+									numFormatter.decimalSeparatorTo = args[2];
+								}
+								value = numFormatter.format(value);
+							}
+							
+							if(curFormat)
+							{
+								var args2:Array = curFormat.split("|");
+								if(args2[0])
+									currFormatter.currencySymbol = args2[0];
+								if(args2[1])
+									currFormatter.precision = args2[1];
+								if(args2[2]){
+									currFormatter.thousandsSeparatorFrom = args2[2];
+									currFormatter.thousandsSeparatorTo = args2[2];
+								}else{
+									currFormatter.useThousandsSeparator = false;
+								}
+								if(args2[3]){
+									currFormatter.decimalSeparatorFrom = args2[3];
+									currFormatter.decimalSeparatorTo = args2[3];
+								}
+								value = currFormatter.format(value);
+							}
+							if(layerDetails && field){
+								var typeID:String = layerDetails.typeIdField ? graphic.attributes[layerDetails.typeIdField] : null;
+								if (fieldName == layerDetails.typeIdField)
+								{
+									// replace value with feature type name
+									var featureType:FeatureType = getFeatureType(typeID);
+									if (featureType && featureType.name)
+									{
+										value = featureType.name;
+									}
+								}
+								else
+								{
+									// replace value with coded value name if one exists
+									var codedValue:CodedValue = getCodedValue(fieldName, value, typeID);
+									if (codedValue)
+									{
+										value = codedValue.name;
+									}
+								}
+							}
+						}
+						
+						if (fieldName.toUpperCase() == queryTitleField.toUpperCase())
+						{
+							title = value;
+							if (!title)
+							{
+								title = widgetTitle;
+							}
+						}
+						if (fieldName.toUpperCase() == queryLinkField.toUpperCase())
+						{
+							//concatenate
+							if(value != "" && value != " "){
+								link = queryLinkPre + value + queryLinkSuffix;
+							}else{
+								link = "";
+							}
+						}
+						if (fieldName.toUpperCase() == queryLinkIcon.toUpperCase())
+						{
+							//concatenate
+							linkicon = queryLinkIconPre + value + queryLinkIconSuffix;
+						}
+						if (fieldName.toUpperCase() == queryMultiImgField.toUpperCase())
+						{
+							multi = value;
+						}
+						if (fieldName.toUpperCase() != "SHAPE_LENGTH" && fieldName.toUpperCase() != "SHAPE_AREA"
+							&& fieldName.toUpperCase() != queryMultiImgField.toUpperCase() && fieldName.toUpperCase() != queryLinkIcon.toUpperCase()
+							&& fieldName.toUpperCase() != queryLinkField.toUpperCase() && fieldName.toUpperCase() != queryTitleField.toUpperCase())
+						{
+							if(fieldXML){
+								if(fieldXML.@gridfieldonly[0] || fieldXML.@hyperlinkgridfieldonly[0]){
+								 //ignore
+								}else{
+									if (fieldXML && fieldXML.@alias[0])
+									{
+										content += fieldXML.@alias[0];
+									}
+									else
+									{
+										content += featureSet.fieldAliases[fieldName];
+									}
+									content += ": " + value + "\n";
+								}
+							}else{
+								if(fieldName != "gid"){
+									content += featureSet.fieldAliases[fieldName];
+									content += ": " + value + "\n";
+								}
+							} 
+						}
+					}
+					if(!queryLinkIconIsField)
+						linkicon = queryLinkIconPre + queryLinkIcon + queryLinkIconSuffix;
+						
+					graphic.checkForMouseListeners = false;
+					
+					var searchResult:SearchResult = new SearchResult();
+					searchResult.title = title;
+					searchResult.content = content;
+					searchResult.point = getGeomCenter(graphic);
+					searchResult.link = (link != "") ? link : null;
+					searchResult.linkicon = linkicon ? linkicon : null;
+					searchResult.geometry = graphic.geometry;
+					searchResult.multi = multi ? multi :null;
+					searchResult.gid=gid;
+					searchResult.graphic = graphic;
+					
+					gid += 1;
+					
+					switch (graphic.geometry.type)
+					{
+						case Geometry.MAPPOINT:
+						{
+							graphic.symbol = searchResult.symbol = resultMarkerSymbol;
+							break;
+						}
+						case Geometry.POLYLINE:
+						{
+							graphic.symbol = searchResult.symbol = resultLineSymbol;
+							break;
+						}
+						case Geometry.POLYGON:
+						{
+							graphic.symbol = searchResult.symbol = resultFillSymbol;
+							break;
+						}
+					}
+					graphic.attributes = searchResult;
+					result.addItem(searchResult);
+					
+					if (searchResult.point && !isNaN(searchResult.point.x) && !isNaN(searchResult.point.y)) // make sure it is a valid point
+					{
+						graphicsLayer.add(graphic);
+					}
+					// infowWindowRenderer on each graphic
+					var infoWindowRenderer:ClassFactory = new ClassFactory(PopUpRenderer);
+					infoWindowRenderer.properties = { popUpInfo: configurePopUpInfo(link)};
+					graphic.infoWindowRenderer = infoWindowRenderer;
+				}
+				return result;
+			}
+			
+			private function getFieldXML(fieldName:String, fields:XMLList):XML
+			{
+				var result:XML;
+				
+				for each (var fieldXML:XML in fields)
+				{
+					if (fieldName == fieldXML.@name[0])
+					{
+						result = fieldXML;
+						break;
+					}
+				}
+				
+				return result;
+			}
+			
+			private function getField(fieldName:String):Field
+			{
+				var result:Field;
+				
+				if (queryLayer)
+				{
+					for each (var field:Field in queryLayer.layerDetails.fields)
+					{
+						if (fieldName == field.name)
+						{
+							result = field;
+							break;
+						}
+					}
+				}
+				
+				return result;
+			}
+			
+			private function getFeatureType(typeID:String):FeatureType
+			{
+				var result:FeatureType;
+				
+				if (queryLayer)
+				{
+					for each (var featureType:FeatureType in queryLayer.layerDetails.types)
+					{
+						if (typeID == featureType.id)
+						{
+							result = featureType;
+							break;
+						}
+					}
+				}
+				
+				return result;
+			}
+			
+			private function msToDate(ms:Number, dateFormat:String, useUTC:Boolean):String
+			{
+				var date:Date = new Date(ms);
+				if (date.milliseconds == 999) // workaround for REST bug
+				{
+					date.milliseconds++;
+				}
+				if (useUTC)
+				{
+					date.minutes += date.timezoneOffset;
+				}
+				
+				if (dateFormat)
+				{
+					dateFormatter.formatString = dateFormat;
+					var result:String = dateFormatter.format(date);
+					if (result)
+					{
+						return result;
+					}
+					else
+					{
+						return dateFormatter.error;
+					}
+				}
+				else
+				{
+					return date.toLocaleString();
+				}
+			}
+			
+			private var layerDomainsCache:Dictionary = new Dictionary(); // map from queryLayer to domainsCache
+			
+			private function getCodedValue(fieldName:String, fieldValue:String, typeID:String):CodedValue
+			{
+				var result:CodedValue;
+				
+				var domainsCache:Object = layerDomainsCache[queryLayer];
+				if (!domainsCache)
+				{
+					domainsCache = {}; // map from (fieldName + typeID) to CodedValueDomain
+					layerDomainsCache[queryLayer] = domainsCache;
+				}
+				
+				var domainsKey:String = fieldName + typeID;
+				var codedValueDomain:CodedValueDomain;
+				
+				if (domainsKey in domainsCache)
+				{
+					codedValueDomain = domainsCache[domainsKey];
+				}
+				else
+				{
+					if (typeID)
+					{
+						var featureType:FeatureType = getFeatureType(typeID);
+						if (featureType)
+						{
+							codedValueDomain = featureType.domains[fieldName] as CodedValueDomain;
+						}
+					}
+					else
+					{
+						var field:Field = getField(fieldName);
+						if (field)
+						{
+							codedValueDomain = field.domain as CodedValueDomain;
+						}
+					}
+					domainsCache[domainsKey] = codedValueDomain;
+				}
+				
+				if (codedValueDomain)
+				{
+					for each (var codedValue:CodedValue in codedValueDomain.codedValues)
+					{
+						if (fieldValue == codedValue.code)
+						{
+							result = codedValue;
+							break;
+						}
+					}
+				}
+				
+				return result;
+			}
+			
+			private function popCBwithUserList(userList:String):void
+			{
+				configUserVals = [];
+				
+				var uArray:Array = StringUtil.trimArrayElements(userList,",").split(",");
+				
+				for each (var val:String in uArray)
+				{
+					var uval:String = val;
+					var ulbl:String = val;
+					var uVal:Object = 
+					{
+						value: uval,
+						label: ulbl
+					}
+					configUserVals.push(uVal);
+				}
+				
+				cbSearch.dataProvider = configUserVals;
+				cbSearch.visible = true;
+				cbSearch.includeInLayout = true;
+				txtSearch.visible = false;
+				txtSearch.includeInLayout = false;
+			}
+			
+			private function popCBwithDomain(fieldName:String):void
+			{
+				configDomainVals = [];
+				
+				var tfield:Field;
+				
+				var i:int = cboLayerText.selectedIndex;
+				if (i == -1){
+					queryLayer = configSearchText[0].layer;
+				}else{
+					queryLayer = configSearchText[i].layer;
+				}
+				
+				if (queryLayer && !queryLayer.loaded)
+				{
+					queryLayer.addEventListener(LayerEvent.LOAD, queryLayer_loadHandler);
+					function queryLayer_loadHandler(event:LayerEvent):void
+					{
+						popCBwithDomain(fieldName);
+					}
+					return;
+				}
+				
+				var domainsCache:Object = layerDomainsCache[queryLayer];
+				if (!domainsCache)
+				{
+					domainsCache = {}; // map from (fieldName + typeID) to CodedValueDomain
+					layerDomainsCache[queryLayer] = domainsCache;
+				}
+				
+				var domainsKey:String = fieldName;
+				var codedValueDomain:CodedValueDomain;
+				
+				if (domainsKey in domainsCache)
+				{
+					codedValueDomain = domainsCache[domainsKey];
+				}
+				else
+				{
+					var field:Field = getField(fieldName);
+					if (field)
+					{
+						codedValueDomain = field.domain as CodedValueDomain;
+					}
+					domainsCache[domainsKey] = codedValueDomain;
+				}
+				
+				if(codedValueDomain)
+				{
+					for each (var codedValue:CodedValue in codedValueDomain.codedValues)
+					{
+						var dVal:String = codedValue.code;
+						var dLbl:String = codedValue.name;
+						var domVal:Object = 
+						{
+							value: dVal,
+							label: dLbl
+						}
+						configDomainVals.push(domVal);
+					}
+					
+					cbSearch.dataProvider = configDomainVals;
+					cbSearch.visible = true;
+					cbSearch.includeInLayout = true;
+					txtSearch.visible = false;
+					txtSearch.includeInLayout = false;
+				}
+			}
+			
+			//get geom center
+			private function getGeomCenter(gra:Graphic):MapPoint
+			{
+				var pt:MapPoint;
+				switch (gra.geometry.type)
+				{
+					case Geometry.MAPPOINT:
+					{
+						pt = gra.geometry as MapPoint;
+						break;
+					}
+						
+					case Geometry.POLYLINE:
+					{
+						var pl:Polyline = gra.geometry as Polyline;
+						var pathCount:Number = pl.paths.length;
+						var pathIndex:int = int((pathCount / 2) - 1);
+						var midPath:Array = pl.paths[pathIndex];
+						var ptCount:Number = midPath.length;
+						var ptIndex:int = int((ptCount / 2) - 1);
+						pt = pl.getPoint(pathIndex, ptIndex);
+						break;
+					}
+						
+					case Geometry.POLYGON:
+					{
+						var poly:Polygon = gra.geometry as Polygon;
+						pt = poly.extent.center;
+						break;
+					}
+				}
+				return pt;
+			}			
+					
+			private function getDrawGra():void
+			{
+				if(drawGraphicsLayer)
+				{
+					var geom:Geometry
+					var graLayAC:ArrayCollection = drawGraphicsLayer.graphicProvider as ArrayCollection;
+					if (graLayAC.length > 1){
+						geom = unionGeoms2(drawGraphicsLayer);
+						queryFeaturesGraphical(geom, "esriSpatialRelIntersects", configSearchGraphical[cboLayerGraphical.selectedIndex]);
+					}else if (graLayAC.length == 1){
+						geom = (graLayAC[0] as Graphic).geometry;
+						queryFeaturesGraphical(geom, "esriSpatialRelIntersects", configSearchGraphical[cboLayerGraphical.selectedIndex]);
+					}else if(drawGraphicsLayer.graphicProvider.length == 0){
+						showStateResults();
+						showMessage("There are no graphics availible",false);
+					}
+				} else {
+					showStateResults();
+					showMessage("There are no graphics availible",false);
+				}
+			}
+			
+			private function getBufferGra():void
+			{
+				if(bufferGraphicsLayer)
+				{
+					var geom:Geometry
+					var graLayAC:ArrayCollection = bufferGraphicsLayer.graphicProvider as ArrayCollection;
+					if (graLayAC.length > 1){
+						geom = unionGeoms2(bufferGraphicsLayer);
+						queryFeaturesGraphical(geom, "esriSpatialRelIntersects", configSearchGraphical[cboLayerGraphical.selectedIndex]);
+					}else if (graLayAC.length == 1){
+						geom = (graLayAC[0] as Graphic).geometry;
+						queryFeaturesGraphical(geom, "esriSpatialRelIntersects", configSearchGraphical[cboLayerGraphical.selectedIndex]);
+					}else if(bufferGraphicsLayer.graphicProvider.length == 0){
+						showStateResults();
+						showMessage("There are no graphics availible",false);
+					}
+				} else {
+					showStateResults();
+					showMessage("There are no graphics availible",false);
+				}
+			}
+			
+			private function checkForGL(evt:Event):void
+			{
+				MapUtil.forEachMapLayer(map, function(layer:Layer):void
+				{
+					if(layer.name.toLowerCase() == "draw features"){
+						drawGraphicsLayer = layer as GraphicsLayer;
+						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkDrawNumGras);
+						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkDrawNumGras);
+						drawGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkDrawNumGras);
+					}
+				});
+			}
+			
+			private function checkDrawNumGras(event:Event):void
+			{
+				clearMessage();
+				if(drawGraphicsLayer){
+					eDrawBtn.filters = (drawGraphicsLayer.numGraphics > 0)?[]:[cOver];
+					eDrawBtn.buttonMode = eDrawBtn.useHandCursor = eDrawBtn.enabled = (drawGraphicsLayer.numGraphics > 0);
+				}
+			}
+			
+			private function clear():void
+			{
+				addSharedData("Deactivate_DrawTool", null); // to be able to deactivate drawTool on other widgets
+				
+				//hide infowindow if any
+				hideInfoWindow();
+				
+				if(currentState == "resultsList"){
+					currentState = lState;
+					if(lState == "graphicalInput"){
+						wTemplate.selectedTitlebarButtonIndex = 1;
+					}else if (lState == "textInput"){
+						wTemplate.selectedTitlebarButtonIndex = 2;
+					}else{
+						wTemplate.selectedTitlebarButtonIndex = 3;
+					}
+				}
+				graphicsLayer.clear();
+				graphicsLayerBuffer.clear();
+				graGraphicsLayer.clear();
+				clearMessage();
+				txtSearch.text = "";
+				sumField = "";
+				searchResultAC = null;
+				if (myfloatdg)
+					myfloatdg.datagrid.dataProvider.removeAll();
+				if(floatorfixed == "fixed")
+					addSharedData("clearFixedDatagrid", null);
+			}
+			
+			private function clearBuffer():void
+			{
+				graphicsLayerBuffer.clear();
+			}		
+			
+			private var hitimer:uint;
+			private var Hits:Array = new Array();									
+			
+			private function showMessage(msg:String, swfVisible:Boolean):void
+			{
+				txtMessage.text = msg;
+				swfMessage.visible = swfVisible;
+				msgVisible = true;
+			}			
+			
+			private function clearMessage():void
+			{
+				msgVisible = false;
+			}
+			
+			private function clickSearchResult(event:Event):void
+			{
+				var recAC:ArrayCollection = searchResultDG.dataProvider as ArrayCollection;
+				var searchResult:SearchResult = ItemRenderer(event.target).data as SearchResult;
+				unhighlightDataGroupItems();
+				searchResult.selected = true;
+				
+				if(lState == "textInput"){
+					var i:Number = cboLayerText.selectedIndex;
+					zoomScale = configSearchText[i].zoomscale;
+				} else if(lState == "graphicalInput"){
+					var i2:Number = cboLayerGraphical.selectedIndex;
+					zoomScale = configSearchGraphical[i2].zoomscale;
+				}
+				
+				if (searchResult.geometry)
+				{
+					if (searchResult.geometry.type == Geometry.MAPPOINT)
+					{
+						if (map.scale > zoomScale)
+						{
+							map.scale = zoomScale;
+						}
+						
+						map.centerAt(searchResult.point);
+					}
+					else
+					{
+						if(isNaN(zoomScale)){
+							map.extent = searchResult.geometry.extent;
+							
+							if (!map.extent.contains(searchResult.geometry))
+							{
+								map.level--;
+							}
+						}else{
+							if (map.scale > zoomScale)
+							{
+								map.scale = zoomScale;
+							}
+							
+							map.centerAt(searchResult.point);
+						}
+					}
+				}
+				
+				Hits.length = 0;
+				
+				if(myfloatdg){
+					if(myfloatdg.datagrid.dataProvider){
+						for each(var attributes:Object in gridDataProvider)
+						{
+							if (attributes.gid === searchResult.gid)
+							{
+								var myCursor:IViewCursor = myfloatdg.datagrid.dataProvider.createCursor();
+								while(!myCursor.afterLast){
+									if(myCursor.current.gid == attributes.gid)
+										Hits.push(myCursor.current);
+									myCursor.moveNext();
+								}
+								myfloatdg.datagrid.selectedIndex = myfloatdg.datagrid.dataProvider.getItemIndex(Hits[0])                        
+							}
+						}                
+						myfloatdg.datagrid.scrollToIndex(myfloatdg.datagrid.selectedIndex);
+					}
+				}
+				if(floatorfixed == "fixed"){
+					var dgCongig:Object = {
+						searchResultgid: searchResult.gid
+					}
+					var dgconfigArr:ArrayCollection = new ArrayCollection();
+					dgconfigArr.addItem(dgCongig);
+					addSharedData("scrollFixedDataGrid", dgconfigArr);
+				}
+			}
+			
+			private function mouseOverSearchResult(event:Event):void
+			{
+				clearTimeout(hitimer);
+				var searchResult:SearchResult = ItemRenderer(event.target).data as SearchResult;
+				if (map.extent.containsXY(searchResult.point.x, searchResult.point.y)) // only show infowindow if search result in contained within map extent
+				{
+					hitimer = setTimeout(showHighlight, 300, [ searchResult ]);
+				}
+				else
+				{
+					hideInfoWindow();
+				}
+				
+				Hits.length = 0;
+				
+				if(myfloatdg){
+					if(myfloatdg.datagrid && myfloatdg.datagrid.dataProvider){
+						for each(var attributes:Object in gridDataProvider)
+						{
+							if (attributes.gid === searchResult.gid)
+							{
+								var myCursor:IViewCursor = myfloatdg.datagrid.dataProvider.createCursor();
+								while(!myCursor.afterLast){
+									if(myCursor.current.gid == attributes.gid)
+										Hits.push(myCursor.current);
+									myCursor.moveNext();
+								}
+								myfloatdg.datagrid.selectedIndex = myfloatdg.datagrid.dataProvider.getItemIndex(Hits[0])                        
+							}
+						}                
+						myfloatdg.datagrid.scrollToIndex(myfloatdg.datagrid.selectedIndex);
+					}
+				}
+				if(floatorfixed == "fixed"){
+					var dgCongig:Object = {
+						searchResultgid: searchResult.gid
+					}
+					var dgconfigArr:ArrayCollection = new ArrayCollection();
+					dgconfigArr.addItem(dgCongig);
+					addSharedData("scrollFixedDataGrid", dgconfigArr);
+				}
+			}
+			
+			private function mouseOutSearchResult(event:Event):void
+			{
+				clearTimeout(hitimer);
+			}
+			
+			private function widgetOpenedHandler(event:Event):void
+			{
+				if(graphicsLayer)
+					graphicsLayer.visible = true;
+				if (graphicsLayerBuffer)
+					graphicsLayerBuffer.visible = true;
+				if (graGraphicsLayer)
+					graGraphicsLayer.visible = true;
+			}
+			
+			private function mapResizeHandler(evt:Event):void
+			{
+				if(myfloatdg){
+					myfloatdg.y = map.height + Number(ViewerContainer.getInstance().mapManager.top) - myfloatdg.height;
+					myfloatdg.x = 0;
+				}
+			}
+			
+			private function showGridResults():void
+			{
+				try
+				{
+					if(gridFields.length == 0){
+						showMessage("No Datagrid configured for this layer", false);
+						return;
+					}
+					
+					if(floatorfixed == "float"){
+						if(!myfloatdg){
+							myfloatdg = SearchWidgetFloatDG(PopUpManager.createPopUp(map,SearchWidgetFloatDG,false,PopUpManagerChildList.POPUP));
+							PopUpManager.centerPopUp(myfloatdg);
+							//If you want the floating datagrid to constantly appear in the bottom left corner uncomment the next two lines
+							//myfloatdg.y = map.height + Number(ViewerContainer.getInstance().mapManager.top) - myfloatdg.height;
+							//myfloatdg.x = 0;
+						}else{
+							var exists:Boolean = false;
+							for (var p:Number=0;p<systemManager.popUpChildren.numChildren;p++) {
+								if(systemManager.popUpChildren.getChildAt(p) is SearchWidgetFloatDG)
+								{
+									exists = true;
+									break;
+								}
+							}
+							if(exists == false)
+								PopUpManager.addPopUp(myfloatdg,map,false); 
+							PopUpManager.centerPopUp(myfloatdg);
+							//If you want the floating datagrid to constantly appear in the bottom left corner uncomment the next two lines
+							//myfloatdg.y = map.height + Number(ViewerContainer.getInstance().mapManager.top) - myfloatdg.height;
+							//myfloatdg.x = 0;
+						}
+						if(!gridFields)
+							gridFields = configSearchText[0].gridfields;
+						myfloatdg.enableExport = configSearchText[0].enableexport;
+						myfloatdg.layerDetails = queryLayer.layerDetails;
+						myfloatdg.csvSeperator = csvSep;
+						myfloatdg.csvExportOptionLbl = exp2csvOptLbl;
+						myfloatdg.txtExportOptionLbl = exp2txtOptLbl;
+						myfloatdg.ExportButtonLbl = expBtnLbl;
+						myfloatdg.csvName = _csvName;
+						myfloatdg.sumField = sumField;
+						myfloatdg.labelSum = lblSum;
+						myfloatdg.dgFieldAliases = fldAliases;
+						myfloatdg.dgColumns = gridFields;
+						myfloatdg.dgHyperColumns = gridHyperFields;
+						myfloatdg.dProvider = gridDataProvider;
+						myfloatdg.graphicslayer = graphicsLayer;
+						if(lState == "graphicalInput"){
+							var i2:Number = cboLayerGraphical.selectedIndex;
+							zoomScale = configSearchGraphical[i2].zoomscale;
+							myfloatdg.enableExport = configSearchGraphical[i2].enableexport;
+						}else if (lState == "textInput"){
+							var i:Number = cboLayerText.selectedIndex;
+							zoomScale = configSearchText[i].zoomscale;
+							myfloatdg.enableExport = configSearchText[i].enableexport;
+						}
+						myfloatdg.zoomScale = zoomScale;
+						myfloatdg.ownerWidget = this;
+					}
+					
+				}
+				catch (error:Error)
+				{
+					showMessage(error.message, false);
+				}
+			}
+			
+			public function highlightDataGroupItem(gra:Graphic):void
+			{
+				var recAC:ArrayCollection = searchResultDG.dataProvider as ArrayCollection;
+				if(gra){
+					var sr:SearchResult = gra.attributes as SearchResult;						
+					for (var i:Number = 0; i < recAC.length; i++)
+					{
+						var sr1:SearchResult = searchResultAC[i];
+						if(sr1.gid === sr.gid)
+						{
+							sr1.selected = true;
+							searchResultDG.verticalScrollPosition = searchResultDG.getElementAt(searchResultDG.getItemIndicesInView()[0]).height * i;
+							break;
+						}
+					}
+				}
+			}
+			
+			public function clearSelected():void
+			{
+				var recAC:ArrayCollection = searchResultDG.dataProvider as ArrayCollection;
+				if(recAC){
+					for (var i:Number = 0; i < recAC.length; i++)
+					{
+						var sr:SearchResult = searchResultAC[i];
+						sr.selected = false;
+					}
+				}
+			}
+			
+			public function unhighlightDataGroupItems():void
+			{
+				var recAC:ArrayCollection = searchResultDG.dataProvider as ArrayCollection;
+				for (var i:Number = 0; i < recAC.length; i++)
+				{
+					var sr:SearchResult = searchResultAC[i];
+					if(sr.gid == sr.gid)
+					{
+						sr.selected = false;
+					}
+				}
+			}
+			
+			private function showHighlight(params:Array):void
+			{
+				var showHighlightPoint:MapPoint = params[0].point as MapPoint;
+				
+				popUpRenderer.popUpInfo = configurePopUpInfo(params[0].graphic.attributes.link);
+				popUpRenderer.graphic = params[0].graphic;
+				
+				map.infoWindow.content = popUpRenderer;
+				map.infoWindow.contentOwner = popUpRenderer.graphic;
+				map.infoWindow.show(showHighlightPoint);
+			}
+			
+			private function configurePopUpInfo(link:String):PopUpInfo
+			{
+				var popUpInfo:PopUpInfo = new PopUpInfo;
+				
+				popUpInfo.title = "{title}";
+				popUpInfo.description = "{content}";
+				
+				if (link)
+				{
+					var pos:Number = link.length - 4;
+					var sfx:String = link.substr(pos, 4).toLowerCase();
+					if ((sfx == ".jpg") || (sfx == ".png") || (sfx == ".gif")) // use PopUpMediaInfo if it is an image
+					{
+						var popUpMediaInfo:PopUpMediaInfo = new PopUpMediaInfo;
+						popUpMediaInfo.type = PopUpMediaInfo.IMAGE;
+						popUpMediaInfo.imageLinkURL = link;
+						popUpMediaInfo.imageSourceURL = link;
+						popUpInfo.popUpMediaInfos = [ popUpMediaInfo ];
+					}
+					else
+					{
+						popUpInfo.description += "<br/><a href='{link}'>{link}</a>"
+					}
+				}
+				
+				return popUpInfo;
+			}
+			
+			private function showStateGraphicalSearch():void
+			{
+				lState = currentState;
+				currentState = "graphicalInput";
+			}
+			
+			private function showStateTextSearch():void
+			{
+				lState = currentState;
+				currentState = "textInput";
+			}				
+			
+			private function showStateResults():void
+			{
+				lState = currentState;
+				currentState = "resultsList";
+				if(configSearchText.length){
+					if(configSpatialSearchLayers.length){
+						wTemplate.selectedTitlebarButtonIndex = 4;
+					}else{
+						wTemplate.selectedTitlebarButtonIndex = 3;
+					}
+				}else{
+					if(configSpatialSearchLayers.length){
+						wTemplate.selectedTitlebarButtonIndex = 3;
+					}else{
+						wTemplate.selectedTitlebarButtonIndex = 2;
+					}
+				}
+			}
+			
+			private function showStateSpatialSearch():void
+			{
+				lState = currentState;
+				currentState = "spatialInput";
+			}
+			
+			private function widgetClosedHandler(event:Event):void
+			{
+				setMapAction(null, null, null, null);
+				graphicsLayer.visible = false;
+				hideInfoWindow();
+				setMapNavigation(null, null);
+				
+				if (selectedDrawingIcon)
+					selectedDrawingIcon = null;
+			}
+			
+			private function graphicsLayer_hideHandler(event:FlexEvent):void
+			{
+				hideInfoWindow();
+			}
+			
+			private function sldrDataTipFormatter(value:Number):String 
+			{ 
+				return int(value * 100) + "%"; 
+			}
+			
+			private function fnInit():void
+			{
+				cbSearch.addEventListener(ListEvent.ITEM_ROLL_OVER,fnCreToolTip);
+				cbSearch.addEventListener(ListEvent.ITEM_ROLL_OUT,fnCreToolTip);
+				cbSearch.addEventListener(ListEvent.CHANGE,fnCreToolTip);
+			}
+			
+			private function fnCreToolTip(e:ListEvent):void
+			{
+				switch(e.type)
+				{
+					case ListEvent.ITEM_ROLL_OVER:
+					{
+						try{
+							ToolTipManager.destroyToolTip(myTip);
+						}
+						catch(error:Error){}
+						//creates a tooltip.
+						myTip = ToolTipManager.createToolTip(cbSearch.dataProvider[e.rowIndex].label,stage.mouseX+10,stage.mouseY) as ToolTip; // array2 is id of arraylist  
+						break;
+					}
+					case ListEvent.ITEM_ROLL_OUT:
+					{
+						//destroy the created tooltip, so that we can create a new one for others.
+						try{
+						ToolTipManager.destroyToolTip(myTip);
+						}
+						catch(error:Error){}
+						break;
+					}
+					case ListEvent.CHANGE:
+					{
+						//destroy the created tooltip, so that we can create a new one for others.
+						ToolTipManager.destroyToolTip(myTip);
+						break;
+					}
+				}
+			}
+			
+			private function zoomAll():void
+			{
+				if(resultsFeatureSet){
+					var graphicsExtent:Extent = GraphicUtil.getGraphicsExtent(resultsFeatureSet.features);
+					map.extent = graphicsExtent.expand(1.2);
+					// make sure the whole extent is visible
+					if (!map.extent.contains(graphicsExtent.expand(1.2)))
+					{
+						map.level--;
+					}
+				}
+			}
+			
+			private function geometryService_faultHandler(event:FaultEvent):void
+			{
+				Alert.show(event.fault.toString(), wTemplate.widgetTitle);
+			}
+			
+			private function iconRollOverHandler(event:MouseEvent):void
+			{
+				clearSelectionFilter();
+				event.target.filters = [ glowFilter ];
+			}
+			
+			private function iconRollOutHandler(event:MouseEvent):void
+			{
+				clearSelectionFilter();
+			}
+			
+			private function clearSelectionFilter():void
+			{
+				for (var i:int = 0; i < imageGroup.numChildren; i++)
+				{
+					if (imageGroup.getChildAt(i).filters && imageGroup.getChildAt(i).filters.length > 0)
+					{
+						if (!(selectedDrawingIcon && imageGroup.getChildAt(i) === selectedDrawingIcon))
+						{
+							if(imageGroup.getChildAt(i)!== eDrawBtn && imageGroup.getChildAt(i)!== pBufferBtn)
+								imageGroup.getChildAt(i).filters = [];
+						}
+					}
+				}
+			}
+			
+			private function sharedDataUpdated(event:AppEvent):void
+			{
+				var data:Object = event.data;
+				
+				if (data.key == "Deactivate_DrawTool")
+				{
+					setMapAction(null, null, null, null);
+					if (selectedDrawingIcon)
+					{
+						selectedDrawingIcon.filters = [];
+						selectedDrawingIcon = null;
+					}
+				}
+			}
+			
+			private function hideInfoWindow():void
+			{
+				if (map.infoWindow.contentOwner &&
+					((map.infoWindow.contentOwner is Graphic && Graphic(map.infoWindow.contentOwner).graphicsLayer === graphicsLayer) || map.infoWindow.contentOwner is Map))
+				{
+					map.infoWindow.hide();
+				}
+			}
+
+		]]>
+	</fx:Script>
+	
+	<viewer:WidgetTemplate id="wTemplate"
+						   closed="widgetClosedHandler(event)" 
+						   open="widgetOpenedHandler(event)"
+						   width="400" height="240"
+						   minHeight="160"
+						   minWidth="210"
+						   visible="false">
+		<s:Group id="textInput"
+				 width="100%" height="100%"
+				 visible="false"
+				 visible.textInput="true">
+			<s:layout>
+				<s:VerticalLayout gap="4" horizontalAlign="center"/>
+			</s:layout>
+			<s:HGroup id="boxText"
+					  width="100%"
+					  gap="15"
+					  horizontalAlign="center" verticalAlign="middle">
+				<s:Label id="lblLayerText" text="{layerLabel}"/>
+				<mx:ComboBox id="cboLayerText" change="searchLayerChangedText()"/>
+			</s:HGroup>
+			<s:HGroup id="boxTextexpr"
+					  width="100%"
+					  gap="15"
+					  horizontalAlign="center"  verticalAlign="middle">
+				<s:Label id="lblExprText" text="{layerExprLabel}"/>
+				<mx:ComboBox id="cboLayerExpr" change="searchLayerExprChangedText()"/>
+			</s:HGroup>
+			<s:RichEditableText id="txtLabelText"
+			 		 selectable="true"
+					 editable="false"
+					 width="100%"
+					 text=""
+					 textAlign="center"/>
+			<s:TextInput id="txtSearch" width="90%" enter="queryFeaturesText()"/>
+			<mx:ComboBox id="cbSearch" creationComplete="{cbSearch.width = wTemplate.width - 40; fnInit();}"
+						 change="queryFeaturesText()" visible="false" includeInLayout="false" 
+						 labelField="label"/>
+			<s:HGroup width="100%" horizontalAlign="center"  verticalAlign="middle">
+				<s:Button click="queryFeaturesText()" label="{submitLabel}"/>
+				<s:Button click="clear()" label="{clearLabel}"/>
+			</s:HGroup>
+		</s:Group>
+		<s:Group id="graphicalInput"
+				 width="100%" height="100%"
+				 visible="false"
+				 visible.graphicalInput="true">
+			<s:layout>
+				<s:VerticalLayout gap="6" horizontalAlign="center"/>
+			</s:layout>
+			<s:HGroup id="boxGraphical"
+					  width="100%"
+					  gap="15"
+					  horizontalAlign="center">
+				<s:Label id="lblLayerGraphical" text="{layerLabel}"/>
+				<mx:ComboBox id="cboLayerGraphical" change="searchLayerChangedGraphical()"/>
+			</s:HGroup>
+			<s:Label id="txtLabelGraphical"
+					 width="100%"
+					 text=""
+					 textAlign="center"/>
+			<s:HGroup id="imageGroup"
+					  width="100%"
+					  gap="10"
+					  horizontalAlign="center">
+				<mx:Image id="eDrawBtn"
+						  width="40" height="40"
+						  click="getDrawGra()"
+						  source= "widgets/eSearch/assets/images/i_draw_draw.png"
+						  toolTip="{drawGraLabel}" 
+						  visible="{eDrawEnabled}"
+						  includeInLayout="{eDrawEnabled}" />
+				<mx:Image id="pBufferBtn"
+						  width="40" height="40"
+						  click="getBufferGra()"
+						  source= "widgets/eSearch/assets/images/i_draw_buffer.png"
+						  toolTip="{bufferGraLabel}" 
+						  visible="{pBufferEnabled}"
+						  includeInLayout="{pBufferEnabled}" />
+				<mx:Image id="iSearchPnt"
+						  name="{DrawTool.MAPPOINT}"
+						  width="40" height="40"
+						  buttonMode="true"
+						  click="{activateSearchTool(event)}"
+						  rollOut="iconRollOutHandler(event)"
+						  rollOver="iconRollOverHandler(event)"
+						  source="assets/images/i_draw_point.png"
+						  toolTip="{pointLabel}"
+						  useHandCursor="true"/>
+				<mx:Image id="iSearchLine"
+						  name="{DrawTool.POLYLINE}"
+						  width="40" height="40"
+						  buttonMode="true"
+						  click="{activateSearchTool(event)}"
+						  rollOut="iconRollOutHandler(event)"
+						  rollOver="iconRollOverHandler(event)"
+						  source="assets/images/i_draw_line.png"
+						  toolTip="{lineLabel}"
+						  useHandCursor="true"/>
+				<mx:Image id="iSearchExt"
+						  name="{DrawTool.EXTENT}"
+						  width="40" height="40"
+						  buttonMode="true"
+						  click="{activateSearchTool(event)}"
+						  rollOut="iconRollOutHandler(event)"
+						  rollOver="iconRollOverHandler(event)"
+						  source="assets/images/i_draw_rect.png"
+						  toolTip="{rectangleLabel}"
+						  useHandCursor="true"/>
+				<mx:Image id="iSearchPoly"
+						  name="{DrawTool.POLYGON}"
+						  width="40" height="40"
+						  buttonMode="true"
+						  click="{activateSearchTool(event)}"
+						  rollOut="iconRollOutHandler(event)"
+						  rollOver="iconRollOverHandler(event)"
+						  source="assets/images/i_draw_poly.png"
+						  toolTip="{polygonLabel}"
+						  useHandCursor="true"/>
+			</s:HGroup>
+			<s:HGroup width="100%"
+					  horizontalAlign="right"
+					  verticalAlign="middle"
+					  paddingRight="10"
+					  paddingTop="2" gap="10">
+				<s:CheckBox id="graMultiChk" selected="{multiPartGraphicSearch}" label="{enableMultiPartSearch}" change="graMultiChanged()"/>
+				<s:Button id="graFeatureQueryBtn" click="queryFeaturesGra()" label="{submitLabel}"/>
+				<s:Label buttonMode="true"
+						 click="clear()"
+						 fontWeight="bold"
+						 text="{clearLabel}"
+						 textDecoration="underline"/>
+			</s:HGroup>
+			<s:CheckBox id="addTolerance" selected="false" label="{lblTolerance}"/>
+		</s:Group>
+		<s:Group id="spatialInput"
+				 width="100%" height="100%"
+				 visible="false"
+				 visible.spatialInput="true">
+			<s:layout>
+				<s:VerticalLayout gap="6" horizontalAlign="center"/>
+			</s:layout>
+			<s:Label id="lblBuffer" text="{bufferLabel}" width="100%"/>
+			<s:HGroup verticalAlign="middle">
+				<s:TextInput id="textInputBuffer" text="50" width="40" />
+				<mx:ComboBox id="cboBufferUnit" />
+				<mx:ColorPicker id="cpBufferColor" selectedColor="#01b9fd" toolTip="{bufferColorLabel}" />
+				<s:HSlider id="hsBufferAlpha" width="55" value="0.3" minimum="0" maximum="1" snapInterval="0.1"
+				toolTip="{bufferAlphaLabel}" dataTipFormatFunction="sldrDataTipFormatter"
+			    skinClass="widgets.eSearch.alphaSliderSkin"/>
+			</s:HGroup>
+			<s:HGroup width="100%" gap="20" horizontalAlign="center" verticalAlign="middle">
+				<mx:Image width="40" height="40"
+						  buttonMode="true"
+						  click="applyBuffer()"
+						  source="widgets/eSearch/assets/images/i_buffer.png"
+						  toolTip="{applyBufferLabel}"
+						  useHandCursor="true"/>
+				<mx:Image width="40" height="40"
+						  buttonMode="true"
+						  click="clearBuffer()"
+						  source="assets/images/i_clear.png"
+						  toolTip="{clearLabel}"
+						  useHandCursor="true"/>
+			</s:HGroup>	
+			<s:Line xFrom="0" xTo="350" yFrom="0" yTo="0">
+				<s:stroke>
+					<s:SolidColorStroke color="0xFFFFFF" weight="1"/>
+				</s:stroke>
+			</s:Line>
+			<s:Label id="lblSearchLayerSpatial" text="{searchLayerLabel}" width="100%"/>
+			<mx:ComboBox id="cboSearchLayerSpatial"/>
+			<s:HGroup id="SpatialOps" width="100%" gap="0" horizontalAlign="center" verticalAlign="middle" />		
+		</s:Group>
+		<!-- result-->
+		<s:Group id="resultsList"
+				 width="100%" height="100%"
+				 visible="false"
+				 visible.resultsList="true">
+			<s:layout>
+				<s:VerticalLayout gap="1"/>
+			</s:layout>
+			<s:HGroup id="boxMessage"
+					  width="100%"
+					  includeInLayout="{msgVisible}"
+					  visible="{msgVisible}" verticalAlign="middle" horizontalAlign="center">
+				<mx:Image id="swfMessage"
+						  source="assets/images/loader.swf"
+						  visible="false"/>
+				<s:Label id="txtMessage"
+						 width="90%"
+						 text=""/>
+				<s:Label buttonMode="true" textAlign="right"
+						 click="zoomAll()"
+						 fontWeight="bold"
+						 includeInLayout="{graphicsLayer.numGraphics &gt; 0}"
+						 text="{zoomallLabel}"
+						 textDecoration="underline"
+						 toolTip="{zoomallTip}"
+						 visible="{graphicsLayer.numGraphics &gt; 0}"/>
+				<s:Label buttonMode="true" textAlign="right"
+						 click="clear()"
+						 fontWeight="bold"
+						 includeInLayout="{graphicsLayer.numGraphics &gt; 0}"
+						 text="{clearLabel}"
+						 textDecoration="underline"
+						 visible="{graphicsLayer.numGraphics &gt; 0}"/>
+			</s:HGroup>
+			<s:Scroller id="recVbox" width="100%" height="100%">
+				<Search:SearchResultDataGroup id="searchResultDG"
+											  dataProvider="{searchResultAC}"
+											  searchResultClick="clickSearchResult(event)"
+											  searchResultMouseOut="mouseOutSearchResult(event)"
+											  searchResultMouseOver="mouseOverSearchResult(event)">
+					<Search:layout>
+						<s:VerticalLayout gap="2"
+										  horizontalAlign="justify"
+										  useVirtualLayout="true"/>
+					</Search:layout>
+				</Search:SearchResultDataGroup>
+			</s:Scroller>
+		</s:Group>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

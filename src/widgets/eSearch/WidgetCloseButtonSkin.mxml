@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SparkSkin xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			 xmlns:s="library://ns.adobe.com/flex/spark" 
+			 xmlns:fb="http://ns.adobe.com/flashbuilder/2009" 
+			 minWidth="18" minHeight="18" alpha.disabled="0.5">
+    
+    <fx:Metadata>
+        [HostComponent("spark.components.Button")]
+    </fx:Metadata>
+	
+	<fx:Script fb:purpose="styling">
+		<![CDATA[         
+			/* Define the skin elements that should not be colorized. 
+			For button, the graphics are colorized but the label is not. */
+			static private const exclusions:Array = ["x1", "x2", "border", "hldownstroke2", "hldownstroke1", "shadow"];
+			
+			/** 
+			 * @private
+			 */     
+			override public function get colorizeExclusions():Array {return exclusions;}
+			
+			/**
+			 * @private
+			 */
+			override protected function initializationComplete():void
+			{
+				useChromeColor = true;
+				super.initializationComplete();
+			}  
+			
+			/**
+			 *  @private
+			 */
+			override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number) : void			
+			{
+				super.updateDisplayList(unscaledWidth, unscaledHeight);
+			}
+			
+		]]>        
+	</fx:Script>
+    
+	<s:states>
+		<s:State name="disabled" />
+		<s:State name="down" />
+		<s:State name="over" />
+		<s:State name="up" />
+	</s:states>
+    
+	<!-- layer 1: shadow -->
+	<!--- @private -->
+	<s:Ellipse id="shadow" left="-1" right="-1" top="-1" bottom="-1" x="1" y="1" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x000000" 
+								 color.down="0xFFFFFF"
+								 alpha="0.01"
+								 alpha.down="0" />
+				<s:GradientEntry color="0x000000" 
+								 color.down="0xFFFFFF" 
+								 alpha="0.07"
+								 alpha.down="0.5" />
+			</s:LinearGradient>
+		</s:fill>
+	</s:Ellipse>
+	<!-- layer 2: fill -->
+	<!--- @private -->
+    <s:Ellipse id="fill" left="2" right="2" top="2" bottom="2" x="1" y="1" >
+	  <s:fill>
+		  <s:LinearGradient rotation="90">
+		  <s:GradientEntry color="0xFFFFFF" 
+			   color.over="0xBBBDBD" 
+			   color.down="0xAAAAAA" 
+			   alpha="0.85" />
+		  <s:GradientEntry color="0xD8D8D8" 
+			   color.over="0x9FA0A1" 
+			   color.down="0x929496" 
+			   alpha="0.85" />
+		  </s:LinearGradient>
+	  </s:fill>
+    </s:Ellipse>
+	<!-- layer 3: fill lowlight -->
+	<!--- @private -->
+	<s:Ellipse id="lowlight" left="2" right="2" top="2" bottom="2" x="1" y="1" >
+		<s:fill>
+			<s:LinearGradient rotation="270">
+				<s:GradientEntry color="0x000000" ratio="0.0" alpha="0.0627" />
+				<s:GradientEntry color="0x000000" ratio="0.48" alpha="0.0099" />
+				<s:GradientEntry color="0x000000" ratio="0.48001" alpha="0" />
+			</s:LinearGradient>
+		</s:fill>
+	</s:Ellipse>
+	<!-- layer 4: fill highlight -->
+	<!--- @private -->
+	<s:Ellipse id="highlight" left="2" right="2" top="2" bottom="2" x="1" y="1">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0xFFFFFF"
+								 ratio="0.0"
+								 alpha="0.33" 
+								 alpha.over="0.22" 
+								 alpha.down="0.12"/>
+				<s:GradientEntry color="0xFFFFFF"
+								 ratio="0.48"
+								 alpha="0.33"
+								 alpha.over="0.22"
+								 alpha.down="0.12" />
+				<s:GradientEntry color="0xFFFFFF"
+								 ratio="0.48001"
+								 alpha="0" />
+			</s:LinearGradient>
+		</s:fill>
+	</s:Ellipse>
+	<!-- layer 5: highlight stroke (all states except down) -->
+	<!--- @private -->
+	<s:Ellipse id="highlightStroke" left="0" right="0" top="0" bottom="0" excludeFrom="down" x="1" y="1">
+		<s:stroke>
+			<s:LinearGradientStroke rotation="90" weight="2">
+				<s:GradientEntry color="0xFFFFFF" alpha.over="0.22" />
+				<s:GradientEntry color="0xD8D8D8" alpha.over="0.22" />
+			</s:LinearGradientStroke>
+		</s:stroke>
+	</s:Ellipse>
+	<!-- layer 6: highlight stroke (down state only) -->
+	<!--- @private -->
+	<s:Ellipse id="hldownstroke1" left="1" right="1" top="1" bottom="1" includeIn="down" x="1" y="1">
+		<s:stroke>
+			<s:LinearGradientStroke rotation="90" weight="2">
+				<s:GradientEntry color="0xffffff" alpha="0.25" ratio="0.0" />
+				<s:GradientEntry color="0xffffff" alpha="0.25" ratio="0.001" />
+				<s:GradientEntry color="0xffffff" alpha="0.07" ratio="0.0011" />
+				<s:GradientEntry color="0xffffff" alpha="0.07" ratio="0.965" />
+				<s:GradientEntry color="0xffffff" alpha="0.00" ratio="0.9651" />
+			</s:LinearGradientStroke>
+		</s:stroke>
+	</s:Ellipse>
+	<!--- @private -->
+	<s:Ellipse id="hldownstroke2" left="2" right="2" top="2" bottom="2" includeIn="down" x="1" y="1">
+		<s:stroke>
+			<s:LinearGradientStroke rotation="90" weight="2">
+				<s:GradientEntry color="0xffffff" alpha="0.09" ratio="0.0" />
+				<s:GradientEntry color="0xffffff" alpha="0.00" ratio="0.0001" />
+			</s:LinearGradientStroke>
+		</s:stroke>
+	</s:Ellipse>
+	
+	<!-- layer 7: border - put on top of the fill so it doesn't disappear when scale is less than 1 -->
+	<!--- @private -->
+	<s:Ellipse id="border" left="0" right="0" top="0" bottom="0" width="18" height="18" x="1" y="1">
+		<s:stroke>
+			<s:LinearGradientStroke rotation="90" weight="2">
+				<s:GradientEntry color="0xffffff" 
+								 alpha="0.5625"
+								 alpha.down="0.6375" />
+				<s:GradientEntry color="0xffffff" 
+								 alpha="0.75" 
+								 alpha.down="0.85" />
+			</s:LinearGradientStroke>
+		</s:stroke>
+	</s:Ellipse>
+	
+    <s:Line id="x1" xFrom="6.71436" yFrom="12.8525" xTo="12.7148" yTo="6.85205">
+      <s:stroke>
+        <s:SolidColorStroke color="#ffffff" caps="none" weight="2" joints="miter" miterLimit="4"/>
+      </s:stroke>
+    </s:Line>
+    <s:Line id="x2" xFrom="6.71436" yFrom="6.85205" xTo="12.7148" yTo="12.8525">
+      <s:stroke>
+        <s:SolidColorStroke color="#ffffff" caps="none" weight="2" joints="miter" miterLimit="4"/>
+      </s:stroke>
+    </s:Line>
+</s:SparkSkin>

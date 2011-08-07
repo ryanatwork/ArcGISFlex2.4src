@@ -1,0 +1,265 @@
+<?xml version="1.0" ?>
+<!--
+	See Enhanced Search Widget XML Configuration.pdf for detailed explanation
+-->
+
+<configuration>
+	<layers>
+		<layer>
+			<definitionexpression></definitionexpression>
+			<enableexport>true</enableexport>
+			<name>Guardrails</name>
+			<url>http://gis.calhouncounty.org/ArcGIS/rest/services/Highway/MapServer/4</url>
+			<expressions>
+				<expression alias="Guardrails" textsearchlabel="Search Guardrial by Type..." field="Type" usedomain="true">Type = '[value]'</expression>
+			</expressions>
+			<graphicalsearchlabel>Use one of the graphical search tools to select Guardrial</graphicalsearchlabel>
+			<spatialsearchlayer>true</spatialsearchlayer>
+			<titlefield>ID</titlefield>
+			<fields all="false">
+				<field name="Type" gridfield="true"/>
+				<field name="Road_ID" gridfield="true"/>
+				<field name="Comments" gridfield="true"/>
+				<field name="Type_start_a" gridfield="true"/>
+				<field name="Type_end_a" gridfield="true"/>
+				<field name="ID" gridfield="true"/>
+			</fields>
+			<linkfield></linkfield>
+			<icon isfield="false"></icon>
+			<zoomscale usegeometry="true"/>
+			<autoopendatagrid>true</autoopendatagrid>
+		</layer>
+		<layer>
+			<definitionexpression></definitionexpression>
+			<enableexport>true</enableexport>
+            <name>Louisville Zoning</name>
+            <url>http://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Louisville/LOJIC_LandRecords_Louisville/MapServer/2</url>
+            <expressions>
+            	<expression alias="Zoning Code" textsearchlabel="Search Zoning Code [ Example: OR1 ]:" userlist="OR1,C2,OTF" >upper(ZONING_CODE) = upper('[value]')</expression>
+            	<expression alias="Zoning Type" textsearchlabel="Search Zoning Type [ Example: RESIDENTIAL ]:">upper(ZONING_TYPE) = upper('[value]')</expression>
+            	<expression alias="Zoning Name" textsearchlabel="Search Zoning Name [ Example: RES MULTI-FAMILY ]:">upper(ZONING_NAME) LIKE upper('%[value]%')</expression>
+            </expressions>
+            <graphicalsearchlabel>Use one of the graphical search tools to select Zoning</graphicalsearchlabel>
+			<spatialsearchlayer>true</spatialsearchlayer>
+			<titlefield>ZONING_NAME</titlefield>
+            <linkfield linkprefix="" linksuffix=""></linkfield>
+			<icon isfield="true" iconprefix="" iconsuffix=""></icon>
+            <fields all="true" />
+            <zoomscale usegeometry="false">5000</zoomscale>
+        </layer>
+		<layer>
+			<definitionexpression></definitionexpression>
+			<enableexport>true</enableexport>
+			<name>Parcels</name>
+			<url>http://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Louisville/LOJIC_LandRecords_Louisville/MapServer/0</url>
+			<expressions>
+				<expression alias="Parcel ID" textsearchlabel="Search by Parcel ID  [ Example: 181001490000 ]:">PARCELID = '[value]'</expression>
+			</expressions>
+			<graphicalsearchlabel>Use one of the graphical search tools to select parcels</graphicalsearchlabel>
+			<spatialsearchlayer>true</spatialsearchlayer>
+			<titlefield>PARCELID</titlefield>
+			<fields all="false">
+                <field name="PARCELID" alias="Parcel Id"/>
+            </fields>
+			<linkfield></linkfield>
+			<icon isfield="true"></icon>
+			<zoomscale>40000</zoomscale>
+		</layer>
+		<layer>
+			<definitionexpression></definitionexpression>
+			<enableexport>true</enableexport>
+			<name>Police Facilities</name>
+			<url>http://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Louisville/LOJIC_PublicSafety_Louisville/MapServer/3</url>
+			<expressions>
+				<expression alias="Police Stations Name" textsearchlabel="Search Police Stations by name... [ Example: 2ND DIVISION ]">upper(PD_NAME) = upper('[value]')</expression>
+			</expressions>
+			<graphicalsearchlabel>Use one of the graphical search tools to select Police Stations</graphicalsearchlabel>
+			<spatialsearchlayer>true</spatialsearchlayer>
+			<titlefield>PD_NAME</titlefield>
+			<fields all="false">
+                <field name="PD_NAME" alias="Police Dept. Name" />
+                <field name="ADDRESS" alias="Dept. Address"/>
+            </fields>
+			<linkfield></linkfield>
+			<icon isfield="true"></icon>
+			<zoomscale>1000</zoomscale>
+		</layer>
+		<layer>
+			<definitionexpression></definitionexpression>
+			<enableexport>false</enableexport>
+			<name>Traffic Cameras</name>
+			<url>http://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Louisville/LOJIC_PublicSafety_Louisville/MapServer/2</url>
+			<expressions>
+				<expression alias="Traffic Camera Description" textsearchlabel="Search Traffic Cameras by Location... [ Example: I-71 ]" userlist="I-71,I-64" >upper(DESCRIPTION) LIKE upper('[value]%')</expression>
+			</expressions>
+			<graphicalsearchlabel>Use one of the graphical search tools to select Traffic Cameras</graphicalsearchlabel>
+			<spatialsearchlayer>true</spatialsearchlayer>
+			<titlefield>DESCRIPTION</titlefield>
+			<fields all="false">
+				<field name="DESCRIPTION" alias="Description" gridfield="true"/>
+				<field name="URL" alias="Show Image" hyperlinkgridfield="true" hyperlinkaliastext="Get Traffic Image"/>
+				<field name="ONLINE" alias="Online" gridfield="true" gridfieldonly="true"/>
+				<field name="LAST_UPDATED" alias="Last Updated" gridfield="true" gridfieldonly="true"/>
+			</fields>
+			<linkfield>URL</linkfield>
+			<icon isfield="false">assets/images/i_camera.png</icon>
+			<zoomscale>5000</zoomscale>
+		</layer>
+		<layer>
+			<definitionexpression/>
+			<name>Weather Obs</name>
+			<enableexport>true</enableexport>
+			<url>http://gislap134/ArcGIS/rest/services/Weather_Obs/MapServer/0</url>
+			<expressions>
+				<expression alias="all" textsearchlabel="blah blah">1=1</expression>
+			</expressions>
+			<graphicalsearchlabel>Blah Blah</graphicalsearchlabel>
+			<spatialsearchlayer>false</spatialsearchlayer>
+			<titlefield>Type</titlefield>
+			<fields all="false">
+				<field name="URL" alias="Website Link" hyperlinkgridfield="true" linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=""/>
+				<field name="Type" gridfield="true"/>
+				<field name="Temp" gridfield="true"/>
+			</fields>
+			<linkfield linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=".jpg">URL</linkfield>
+			<icon isfield="true"/>
+			<zoomscale>5000</zoomscale>
+		</layer>
+		<!--<layer>
+			<definitionexpression></definitionexpression>
+			<name>Owner Parcels</name>
+			<enableexport>true</enableexport>
+			<url>http://gislap134/ArcGIS/rest/services/Join_Test/MapServer/0</url>
+			<expressions>
+				<expression alias="Parcel PPIN" textsearchlabel="Search Parcel by PPIN... [ Example: 1234 ]">Upper(parcels2.NAME) LIKE Upper('[value]%')</expression>
+			</expressions>
+			<graphicalsearchlabel>Use one of the graphical search tools to select Parcel</graphicalsearchlabel>
+			<spatialsearchlayer>true</spatialsearchlayer>
+			<titlefield>Objectid</titlefield>
+			<fields all="false">
+				<field name="parcels2.PPIN" gridfield="true" />
+				<field name="parcels2.NAME" gridfield="true" />
+				<field name="parcels2.STREET_ADDRESS" gridfield="true" />
+				<field name="parcels2.USE_CODE" gridfield="true" />
+				<field name="parcels2.CALC_ACRES" gridfield="true" />
+				<field name="parcels2.EXEMPTION_CODE1" gridfield="true" />
+				<field name="parcels2.ADDRESS_1" gridfield="true" gridfieldonly="true" />
+				<field name="parcels2.ADDRESS_3" gridfield="true" gridfieldonly="true" />
+				<field name="parcels2.PRIOR_TAX_YEAR" gridfield="true" />
+				<field name="parcels2.SALE_DATE" gridfield="true" dateformat="MM/DD/YYYY"/>
+				<field name="parcels2.LAST_DEED_BOOK" gridfield="true"/>
+				<field name="parcels2.LAST_DEED_PAGE" gridfield="true"/>
+				<field name="parcels2.ZIPCODE_1" gridfield="true" gridfieldonly="true"/>
+				<field name="parcels2.NEIGHBORHOOD" gridfield="true" gridfieldonly="true"/>
+				<field name="parcels2.SUBDIVISION" gridfield="true"/>
+				<field name="parcels2.SALE_PRICE" gridfield="true" currencyformat="$|2|,|." sum="true" sumlabel="Sales Price: "/>
+				<field name="parcels2.TOTAL_TRUE" gridfield="true" currencyformat="$|2|,|." />
+				<field name="parcels2.LAND_PRICE" gridfield="true" currencyformat="$|2|,|." />
+				<field name="parcels2.IMPR_PRICE" gridfield="true" currencyformat="$|2|,|." />
+				<field name="parcels2.ADJ_PRICE" gridfield="true" currencyformat="$|2|,|." />
+				<field name="parcels2.OVER_COND" alias="PAPA Website Link" hyperlinkgridfield="true" hyperlinkaliastext="Click here for document" linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=""/>
+				<field name="ADJUSTMENT PRICE" gridfield="true"/>
+			</fields>
+			<linkfield linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix="">parcels2.OVER_COND</linkfield>
+			<icon isfield="true"></icon>
+			<zoomscale>5000</zoomscale>
+		</layer>-->
+	</layers>
+	<spatialrelationships>
+		<!-- possible spatial relationships		 
+			esriSpatialRelIntersects | esriSpatialRelContains | esriSpatialRelCrosses | esriSpatialRelEnvelopeIntersects | esriSpatialRelIndexIntersects | esriSpatialRelOverlaps | esriSpatialRelTouches | esriSpatialRelWithin
+			
+			currently unavailable:
+				esriSpatialRelRelation
+		-->	
+		<spatialrelationship>
+			<name>esriSpatialRelContains</name>
+			<label>entirely contained in</label>
+		</spatialrelationship>
+		<spatialrelationship>
+			<name>esriSpatialRelIntersects</name>
+			<label>interssected by</label>
+		</spatialrelationship>
+		<spatialrelationship>
+			<name>esriSpatialRelEnvelopeIntersects</name>
+			<label>intersected by envelop of</label>
+		</spatialrelationship>
+	</spatialrelationships>
+	<bufferunits>
+		<bufferunit>
+			<name>UNIT_FOOT</name>
+			<label>Feet</label>
+		</bufferunit>
+		<bufferunit>
+			<name>UNIT_STATUTE_MILE</name>
+			<label>Miles</label>
+		</bufferunit>
+		<bufferunit>
+			<name>UNIT_METER</name>
+			<label>Meters</label>
+		</bufferunit>		
+		<bufferunit>
+			<name>UNIT_KILOMETER</name>
+			<label>Kilometers</label>
+		</bufferunit>
+	</bufferunits>
+	<tolerance>6</tolerance>
+	<spatialReference>102003</spatialReference>
+	<zoomscale>2400</zoomscale>
+	<geometryservice>http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer</geometryservice>
+	<csvSeparator>,</csvSeparator>
+	<toleranceforpointgraphicalselection>3</toleranceforpointgraphicalselection><!-- value is in screen pixels -->
+	<disablebuttons></disablebuttons><!--possible values one or more not all three search types comma sepearted text,graphic,spatial,grid -->
+	<defaultselectionoption>textInput</defaultselectionoption><!--possible values only one graphicalInput or textInput or spatialInput -->
+	<enabledrawgraphicbutton>true</enabledrawgraphicbutton>
+	<enablebuffergraphicbutton>true</enablebuffergraphicbutton>
+	<selectedgraphicaltool></selectedgraphicaltool><!-- possible values are extent or polygon or mappoint or polyline or nothing -->
+	<multipartgraphicsearch>false</multipartgraphicsearch>
+	<floatorfixed>float</floatorfixed><!-- possible values are fixed and float -->
+	<labels>
+		<addtolerance>Add search tolerance to point selection</addtolerance>
+		<existingdrawgraphicslabel>Use Existing eDraw Widget Graphics</existingdrawgraphicslabel>
+		<existingbuffergraphicslabel>Use Existing Point Buffer Widget Graphics</existingbuffergraphicslabel>
+		<graphicalsearchlabel>Graphical Search</graphicalsearchlabel>
+		<textsearchlabel>Text Search</textsearchlabel>
+		<resultslabel>Results</resultslabel>
+		<layerlabel>Search Layer:</layerlabel>
+		<layerfieldlabel>Search Layer Field:</layerfieldlabel>
+		<nolayerlabel>No search layer defined.</nolayerlabel>
+		<submitlabel>Search</submitlabel>
+		<pointlabel>Select by Point</pointlabel>
+		<linelabel>Select by Line</linelabel>
+		<rectanglelabel>Select by Rectangle</rectanglelabel>
+		<polygonlabel>Select by Polygon</polygonlabel>
+		<clearlabel>Clear</clearlabel>
+		<loadinglabel>Loading...</loadinglabel>
+		<selectionlabel>Features Selected:</selectionlabel>
+		<gridresultsLabel>Show Results in Grid</gridresultsLabel>
+		<csvdefaultname>Selected Records</csvdefaultname>
+		<exportbtnlabel>Export...</exportbtnlabel>
+		<export2csvoptionlabel>Export to CSV...</export2csvoptionlabel>
+		<export2txtoptionlabel>Export to Txt...</export2txtoptionlabel>
+		<bufferLabel>apply a search distance:</bufferLabel>
+		<spatialsearchLabel>Spatial search</spatialsearchLabel>
+		<applybufferlabel>Apply buffer</applybufferlabel>
+		<searchlayerlabel>Search entities of:</searchlayerlabel>
+		<enablemultipartsearch>enable multi-part graphics</enablemultipartsearch>
+		<zoomalllabel>Zoom</zoomalllabel>
+		<zoomalltip>Zoom to all results</zoomalltip>
+		<bufferalpha>Adjust buffer alpha</bufferalpha>
+		<buffercolor>Select buffer color</buffercolor>
+	</labels>
+	<symbols>
+    	<simplefillsymbol color="0xff0000" alpha="0.5">
+    		<outline color="0xff0000" alpha="0.8" width="2"/>
+    	</simplefillsymbol>
+    	<!-- You can have one or the other, either simplemarkersymbol or picturemarkersymbol
+    	     defined for your point results NOT BOTH. picturemarkersymbol will override simplemarkersymbol
+    	     if you do not have it commented out. --> 
+    	<!--<simplemarkersymbol style="square" size="12" color="0xff0000" alpha="0.5" xoffset="0" yoffset="0" angle="0">
+    		<outline style="solid" color="0x000000" alpha="1" width="1"/>
+    	</simplemarkersymbol>-->
+    	<picturemarkersymbol url="assets/images/i_search.png" height="30" width="30" xoffset="0" yoffset="0" />
+		<simplelinesymbol color="0xff0000" alpha="0.8" width="2"/>
+    </symbols>
+</configuration>

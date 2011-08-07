@@ -1,0 +1,880 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	See SearchWidget.mxml to release details
+-->
+<Search:ResizeTitleWindow  xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						   xmlns:s="library://ns.adobe.com/flex/spark" 
+						   xmlns:mx="library://ns.adobe.com/flex/mx"
+						   xmlns:Search="widgets.eSearch.*"
+						   xmlns:esri="http://www.esri.com/2008/ags"
+						   width="622" 
+						   height="300" 
+						   title="Search Results"
+						   close="closeMe()" 
+						   creationComplete="init()" 
+						   cornerRadius="6"
+						   skinClass="widgets.eSearch.ResizeTitleWindowSkin">
+						   <!--titleIcon="@Embed('widgets/eSearch/assets/images/i_table2.png')"-->
+	<Search:layout>
+		<s:VerticalLayout horizontalAlign="center" verticalAlign="middle" />
+	</Search:layout>
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Graphic;
+			import com.esri.ags.Map;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.layers.supportClasses.CodedValue;
+			import com.esri.ags.layers.supportClasses.CodedValueDomain;
+			import com.esri.ags.layers.supportClasses.LayerDetails;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.BaseWidget;
+			import com.esri.viewer.IBaseWidget;
+			import com.esri.viewer.ViewerContainer;
+			
+			import com.esri.ags.webmap.PopUpRenderer;
+			import com.esri.ags.webmap.supportClasses.PopUpInfo;
+			import com.esri.ags.webmap.supportClasses.PopUpMediaInfo;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.IViewCursor;
+			import mx.controls.Alert;
+			import mx.controls.DataGrid;
+			import mx.controls.Menu;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.core.Repeater;
+			import mx.core.UIComponent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.formatters.CurrencyFormatter;
+			import mx.formatters.DateFormatter;
+			import mx.formatters.NumberFormatter;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectUtil;
+			
+			import spark.components.Button;
+			
+			import widgets.eSearch.SearchWidget;
+		
+			private var _data:Object;
+			private var _graLyr:GraphicsLayer;
+			private var _resultsGrid:DataGrid;
+			private var highlightedGraphic:Graphic;
+			private var _zoomScale:Number = 5000;
+			private var _bWidget:BaseWidget;
+			private var _dgColumns:Array=[];
+			private var _dgFieldAliases:Object;
+			private var _dgHyperColumns:Array=[];
+			private var hypercols:ArrayCollection;
+			private var _csvName:String;
+			private var dateFormatter:DateFormatter = new DateFormatter();
+			private var numFormatter:NumberFormatter = new NumberFormatter();
+			private var currFormatter:CurrencyFormatter = new CurrencyFormatter();
+			private var _dateFormat:String = "";
+			private var _currFormat:String = "";
+			private var _numFormat:String = "";
+			private var _csvSep:String = ",";
+			private var _layerDetails:LayerDetails = null;
+			[Bindable]
+			private var _exp2csvBtnLbl:String;
+			[Bindable]
+			private var _exp2txtBtnLbl:String;
+			[Bindable]
+			private var _exportButtonLbl:String;
+			[Bindable]
+			private var _enableExport:Boolean;
+			[Bindable]
+			private var sumVisible:Boolean;
+			[Bindable]
+			private var _labelSum:String;
+			private var _sumField:String = "";
+			private var sumFormat:String;
+			
+			private var uic:UIComponent;
+			
+			private var popUpRenderer:PopUpRenderer = new PopUpRenderer();
+			
+			private var map:Map = ViewerContainer.getInstance().mapManager.map;
+			
+			public function set graphicslayer(value:GraphicsLayer):void
+			{
+				_graLyr = value;
+			}
+			
+			public function set labelSum(value:String):void
+			{
+				_labelSum = value;
+			}
+			
+			public function set sumField(value:String):void
+			{
+				_sumField = value;
+				if(value != "")
+					sumVisible = true;
+				else
+					sumVisible = false;
+			}
+			
+			public function set enableExport(value:Boolean):void
+			{
+				_enableExport = value;
+			}
+			
+			public function set ownerWidget(value:BaseWidget):void
+			{
+				_bWidget = value;
+			}
+			
+			public function set csvName(value:String):void
+			{
+				_csvName = value;
+			}
+			
+			public function set csvSeperator(value:String):void
+			{
+				_csvSep = value;
+			}
+			
+			public function set layerDetails(value:LayerDetails):void
+			{
+				_layerDetails = value;
+			}
+			
+			public function set csvExportOptionLbl(value:String):void
+			{
+				_exp2csvBtnLbl = value;
+			}
+			
+			public function set txtExportOptionLbl(value:String):void
+			{
+				_exp2txtBtnLbl = value;
+			}
+			
+			public function set ExportButtonLbl(value:String):void
+			{
+				_exportButtonLbl = value;
+			}
+			
+			public function set dgColumns(value:Array):void
+			{
+				resultsGrid.columns = [];
+				sumFormat = "";
+				_dgColumns = value;
+				var dgCol:DataGridColumn;
+				var jdgCol:joinDataGridColumn;
+				var dgColArr:Array = [];
+				for(var i:int=0; i < _dgColumns.length; i++)
+				{
+					var cArr:Array = _dgColumns[i].split("~");						
+					dgCol= new DataGridColumn(cArr[0]);
+					if(cArr[0].indexOf( "." ) != -1){
+						jdgCol= new joinDataGridColumn(cArr[0]);
+						jdgCol.labelFunction = getLabel;
+						if (cArr[2] != "NA"){
+							jdgCol.labelFunction = getDateLbl;
+							_dateFormat = cArr[2];
+						}
+						if (cArr[3] != "NA"){
+							jdgCol.labelFunction = getCurrLbl;
+							_currFormat = cArr[3];
+							if(cArr[0] == _sumField)
+								sumFormat = "cur";
+						}
+						if (cArr[4] != "NA"){
+							jdgCol.labelFunction = getNumLbl;
+							_numFormat = cArr[4];
+							if(cArr[0] == _sumField)
+								sumFormat = "num";
+						}
+						if (_dgFieldAliases)
+							jdgCol.headerText = _dgFieldAliases[cArr[0]];
+						if (cArr[1] != "NA")
+							jdgCol.headerText = cArr[1];
+						dgColArr.push(jdgCol);
+					}else{
+						dgCol= new DataGridColumn(cArr[0]);
+						dgCol.labelFunction = getLabel;
+						if (cArr[2] != "NA"){
+							dgCol.labelFunction = getDateLbl;
+							_dateFormat = cArr[2];
+						}
+						if (cArr[3] != "NA"){
+							dgCol.labelFunction = getCurrLbl;
+							_currFormat = cArr[3];
+							if(cArr[0] == _sumField)
+								sumFormat = "cur";
+						}
+						if (cArr[4] != "NA"){
+							dgCol.labelFunction = getNumLbl;
+							_numFormat = cArr[4];
+							if(cArr[0] == _sumField)
+								sumFormat = "num";
+						}
+						if (_dgFieldAliases)
+							dgCol.headerText = _dgFieldAliases[cArr[0]];
+						if (cArr[1] != "NA")
+							dgCol.headerText = cArr[1];
+						dgColArr.push(dgCol);
+					}
+				}
+				dgCol= new DataGridColumn("gid");
+				dgCol.visible = false;
+				dgColArr.push(dgCol);
+				resultsGrid.columns = dgColArr;
+			}
+			
+			public function set dgFieldAliases(value:Object):void
+			{
+				_dgFieldAliases = value;
+			}
+			
+			private function exportTo(event:Event):void
+			{
+				try
+				{
+					var data:String;
+					var defaultFileName:String;
+					if(optiongroup.selectedValue == _exp2csvBtnLbl){
+						data = exportCSV(resultsGrid,_csvSep);
+						defaultFileName = _csvName + ".csv";
+					}else{
+						data = exportTXT(resultsGrid);
+						defaultFileName = _csvName + ".txt";
+					}
+					
+					var fileReference:FileReference = new FileReference();
+	 				fileReference.save(data,defaultFileName);
+	 			}
+	 			catch(error:Error)
+				{
+					Alert.show(error.message);
+				}
+			}
+			
+			private function msToDate(ms:Number, dateFormat:String):String
+			{
+				var date:Date = new Date(ms);
+				if (date.milliseconds == 999) // workaround for REST bug
+				{
+					date.milliseconds++;
+				}
+				
+				if (dateFormat)
+				{
+					dateFormatter.formatString = dateFormat;
+					var result:String = dateFormatter.format(date);
+					if (result)
+					{
+						return result;
+					}
+					else
+					{
+						return dateFormatter.error;
+					}
+				}
+				else
+				{
+					return date.toLocaleString();
+				}
+			}
+			
+			private function exportCSV(dataGrid:DataGrid, csvSeparator:String=",", lineSeparator:String="\n"):String
+			{
+				try
+				{
+					var data:String = "";
+					var columnArray:Array = dataGrid.columns;
+					var columnCount:int = columnArray.length;
+					var dataGridColumn:DataGridColumn;
+					var header:String = "";
+					var headerGenerated:Boolean = false;
+					var dataProvider:Object = ObjectUtil.copy(dataGrid.dataProvider);
+					
+					//trace(ObjectUtil.toString(dataProvider));
+					var rowCount:int = dataProvider.length;
+					var dp:Object = null;
+					var cursor:IViewCursor = dataProvider.createCursor();
+					var j:int = 0;
+					
+					//loop through rows
+					while (!cursor.afterLast)
+					{
+						var object:Object = null;
+						object = cursor.current;
+						//loop through all columns for the row
+						for(var i:int = 0; i < columnCount; i++)
+						{
+							dataGridColumn = columnArray[i];
+							//Exclude column data which is invisible (hidden)
+							if(!dataGridColumn.visible)
+							{
+								continue;
+							}
+							if(dataGridColumn.itemRenderer)
+							{
+								data += "\""+ object[dataGridColumn.dataField] + "\"";
+							}else{
+								data += "\""+ dataGridColumn.itemToLabel(object)+ "\"";
+							}
+							if(i < (columnCount -1))
+							{
+								data += csvSeparator;
+							}
+							//generate header of CSV, only if it's not genereted yet
+							if (!headerGenerated)
+							{
+								header += "\"" + dataGridColumn.headerText + "\"";
+								if (i < columnCount - 1)
+								{
+									header += csvSeparator;
+								}
+							}
+						}
+						headerGenerated = true;
+						if (j < (rowCount - 1))
+						{
+							data += lineSeparator;
+						}
+						j++;
+						cursor.moveNext ();
+					}
+					//set references to null:
+					dataProvider = null;
+					columnArray = null;
+					dataGridColumn = null;		
+				}
+				catch(error:Error)
+				{
+					return null;
+					Alert.show(error.message);
+				}
+				return (header + lineSeparator + data);
+			}
+			
+			private function exportTXT(dataGrid:DataGrid, lineSeparator:String="\n"):String
+			{
+				try
+				{
+					var data:String = "";
+					var columnArray:Array = dataGrid.columns;
+					var columnCount:int = columnArray.length;
+					var dataGridColumn:DataGridColumn;
+					var header:String = "";
+					var headerGenerated:Boolean = false;
+					var dataProvider:Object = ObjectUtil.copy(dataGrid.dataProvider);
+					
+					var rowCount:int = dataProvider.length;
+					var dp:Object = null;
+					var cursor:IViewCursor = dataProvider.createCursor();
+					var j:int = 0;
+					
+					//loop through rows
+					while (!cursor.afterLast)
+					{
+						var object:Object = null;
+						object = cursor.current;
+						//loop through all columns for the row
+						for(var i:int = 0; i < columnCount; i++)
+						{
+							dataGridColumn = columnArray[i];
+							//Exclude column data which is invisible (hidden)
+							if(!dataGridColumn.visible)
+							{
+								continue;
+							}
+							if(dataGridColumn.itemRenderer)
+							{
+								data += "\""+ object[dataGridColumn.dataField] + "\"";
+							}else{
+								data += "\""+ dataGridColumn.itemToLabel(object)+ "\"";
+							}
+							if(i < (columnCount -1))
+							{
+								data += "\t";
+							}
+							//generate header of CSV, only if it's not genereted yet
+							if (!headerGenerated)
+							{
+								header += "\"" + dataGridColumn.headerText + "\"";
+								if (i < columnCount - 1)
+								{
+									header += "\t";
+								}
+							}
+						}
+						headerGenerated = true;
+						if (j < (rowCount - 1))
+						{
+							data += lineSeparator;
+						}
+						j++;
+						cursor.moveNext ();
+					}
+					//set references to null:
+					dataProvider = null;
+					columnArray = null;
+					dataGridColumn = null;		
+				}
+				
+				catch(error:Error)
+				{
+					return null;
+					Alert.show(error.message);
+				}
+				return (header + lineSeparator + data);
+			}
+			
+			// this is going to be executed whenever the data provider changes:
+			[Bindable("dataChange")]
+			private function calcMaxLengths(input:Object):Object {
+				// if there are items in the DP:
+				if ( input.length > 0 ) {
+					// and no SPECIAL child exists:
+					if ( getChildByName("$someTempUICToRemoveAfterFinished") == null ) {
+						// create new SPECIAL child
+						// this is required to call measureText
+						// if you use custom data grid item renderer
+						// then create instance of it instead of UIComponent:
+						uic = new UIComponent();
+						// do not show and do not mess with the sizes:
+						uic.includeInLayout = false;
+						uic.visible = false;
+						// name it to leverage get getChildByName method:
+						uic.name = "$someTempUICToRemoveAfterFinished";
+						// add event listener:
+						uic.addEventListener(FlexEvent.CREATION_COMPLETE, onTempUICCreated);
+						// add to parent:
+						this.addElement(uic);
+					}
+				}
+				// return an input:
+				return input;
+			}
+			
+			// called when SPECIAL child is created:
+			private function onTempUICCreated(event:FlexEvent):void {
+				// keep the ref to the SPECIAL child:
+				var renderer:UIComponent = UIComponent(event.target);
+				// output - this will contain max size for each column:
+				var maxLengths:Object = {};
+				// temp variables:
+				var key:String = "";
+				var i:int=0;
+				var dp:Object = resultsGrid.dataProvider;
+				// for each item in the DP:
+				for ( i=0; i<dp.length; i++ ) {
+					var o:Object = dp[i];
+					// for each key in the DP row:
+					for ( key in o ) {
+						// if the output doesn't have current key yet create it and set to 0:
+						if ( !maxLengths.hasOwnProperty(key) ) {
+							maxLengths[key] = 0;
+						}
+						// check if it's simple object (may cause unexpected issues for Boolean):
+						if ( ObjectUtil.isSimple(o[key]) ) {
+							// measure the text:
+							var cellMetrics:TextLineMetrics = renderer.measureText(o[key]+"");
+							// and if the width is greater than longest found up to now:
+							if ( cellMetrics.width > maxLengths[key] ) {
+							// set it as the longest one:
+								maxLengths[key] = cellMetrics.width;
+							}
+						}
+					}
+				}
+	
+				// apply column sizes:
+				for ( key in maxLengths ) {
+					for ( i=0; i<resultsGrid.columnCount; i++ ) {
+						// if the column actually exists:
+						if ( DataGridColumn(resultsGrid.columns[i]).dataField == key ) {
+							var cellMetrics2:TextLineMetrics = renderer.measureText(key+"");
+							if ( cellMetrics2.width + 18 > Number(maxLengths[key]) + 12 ) {
+								DataGridColumn(resultsGrid.columns[i]).width = cellMetrics2.width + 18;
+							} else {
+								DataGridColumn(resultsGrid.columns[i]).width = Number(maxLengths[key]) + 12;
+							}							
+						}
+					}
+				}
+				// cleanup:
+				removeElement(uic);
+			}
+			
+			private function getLabel(item:Object,column:DataGridColumn):String
+			{
+				return item[column.dataField];
+			}
+			
+			private function getDateLbl(item:Object,column:DataGridColumn):String
+			{
+				var dateMS:Number = Number(item[column.dataField]);
+				var retVal:String = "";
+				var rVal:String = item[column.dataField];
+				if(rVal == null)
+				{
+					//do nothing
+				}else{
+					if (!isNaN(dateMS))
+					{
+						retVal = msToDate(dateMS, _dateFormat);
+					}
+				}
+				return retVal;
+			}
+			
+			private function getNumLbl(item:Object,column:DataGridColumn):String
+			{
+				var args:Array = _numFormat.split("|");
+				if(args[0])
+					numFormatter.precision = args[0];
+				if(args[1]){
+					numFormatter.thousandsSeparatorFrom = args[1];
+					numFormatter.thousandsSeparatorTo = args[1];
+				}else{
+					numFormatter.useThousandsSeparator = false;
+				}
+				if(args[2]){
+					numFormatter.decimalSeparatorFrom = args[2];
+					numFormatter.decimalSeparatorTo = args[2];
+				}
+				return numFormatter.format(item[column.dataField]);
+			}
+			
+			private function getCurrLbl(item:Object,column:DataGridColumn):String
+			{
+				var args:Array = _currFormat.split("|");
+				if(args[0])
+					currFormatter.currencySymbol = args[0];
+				if(args[1])
+					currFormatter.precision = args[1];
+				if(args[2]){
+					currFormatter.thousandsSeparatorFrom = args[2];
+					currFormatter.thousandsSeparatorTo = args[2];
+				}else{
+					currFormatter.useThousandsSeparator = false;
+				}
+				if(args[3]){
+					currFormatter.decimalSeparatorFrom = args[3];
+					currFormatter.decimalSeparatorTo = args[3];
+				}
+				return currFormatter.format(item[column.dataField]);
+			}
+			
+			private function labelFunc2(item:Object, column:DataGridColumn):String
+			{
+				return item[column.dataField];
+			}
+			
+			private function labelFunc(item:Object, column:DataGridColumn):String
+			{
+				var retVal:String = "Get Hyperlink";
+				for each (var obj:Object in hypercols)
+				{
+					if(obj.name == column.headerText)
+						if(obj.alias != "NA")
+							retVal = obj.alias;
+				}
+				if (item[column.dataField] == "" || item[column.dataField] == " "){
+					retVal = "";
+				}
+				return retVal;
+			}
+			
+			public function set dgHyperColumns(value:Array):void
+			{
+				_dgHyperColumns = value;
+				var dgCol:DataGridColumn;
+				var dgColArr:Array = resultsGrid.columns;
+				hypercols = new ArrayCollection();
+				for(var i:int=0; i < _dgHyperColumns.length; i++)
+				{
+					var cArr:Array = _dgHyperColumns[i].split("~");
+					hypercols.addItem({field: cArr[0], name: cArr[1], alias: cArr[2], pre: cArr[3], suf: cArr[4]});
+					dgCol= new DataGridColumn(cArr[0]);
+					dgCol.labelFunction = labelFunc2;
+					if (cArr[2] != "NA")
+						dgCol.labelFunction = labelFunc;
+					if (cArr[1] != "NA")
+						dgCol.headerText = cArr[1];
+					dgCol.itemRenderer = new ClassFactory(HyperLinkColumn);						
+					dgColArr.push(dgCol);
+				}
+				resultsGrid.columns = dgColArr;
+			}
+			
+			public function set zoomScale(value:Number):void
+			{
+				_zoomScale = value;
+			}
+			
+			public function set dProvider(value:Object):void
+			{
+				_data = ObjectUtil.copy(value);
+				for each(var attributes:Object in _data)
+				{
+					for(var i:int=0; i<hypercols.length; i++){
+						Alert.show(hypercols[i].valueOf().toString());
+						//concatenate if
+						if(attributes[hypercols[i].field] != "" && attributes[hypercols[i].field] != " " && attributes[hypercols[i].field] != null){
+							var pre:String = (hypercols[i].pre == "NA") ? "" : hypercols[i].pre;
+							var suf:String = (hypercols[i].suf == "NA") ? "" : hypercols[i].suf;
+							attributes[hypercols[i].field] = String(pre + attributes[hypercols[i].field] + suf);
+						}
+					}
+					
+					if(_layerDetails){
+						var fld:Object;
+						var cVal:CodedValue;
+						var cDomain:CodedValueDomain;
+						for each (fld in _layerDetails.fields)
+						{
+							cDomain = fld.domain;
+							if (cDomain){
+								for each (cVal in cDomain.codedValues)
+								{
+									if(cVal.code == attributes[fld.name])
+										attributes[fld.name] = cVal.name;
+								}
+							}
+						}
+					} 
+				}
+				resultsGrid.dataProvider = calcMaxLengths(_data);
+				
+				//title += " selected records: " + resultsGrid.dataProvider.length.toString();
+				if(_sumField){
+					try
+					{
+						var total:Number = 0;
+						for each (var row:Object in resultsGrid.dataProvider) {
+							total += Number(row[_sumField]);
+						}
+						if(sumFormat == "num"){
+							var args:Array = _numFormat.split("|");
+							if(args[0])
+								numFormatter.precision = args[0];
+							if(args[1]){
+								numFormatter.thousandsSeparatorFrom = args[1];
+								numFormatter.thousandsSeparatorTo = args[1];
+							}else{
+								numFormatter.useThousandsSeparator = false;
+							}
+							if(args[2]){
+								numFormatter.decimalSeparatorFrom = args[2];
+								numFormatter.decimalSeparatorTo = args[2];
+							}
+							taSum.text = numFormatter.format(total);
+						}else if(sumFormat == "cur"){
+							var args2:Array = _currFormat.split("|");
+							if(args2[0])
+								currFormatter.currencySymbol = args2[0];
+							if(args2[1])
+								currFormatter.precision = args2[1];
+							if(args2[2]){
+								currFormatter.thousandsSeparatorFrom = args2[2];
+								currFormatter.thousandsSeparatorTo = args2[2];
+							}else{
+								currFormatter.useThousandsSeparator = false;
+							}
+							if(args2[3]){
+								currFormatter.decimalSeparatorFrom = args2[3];
+								currFormatter.decimalSeparatorTo = args2[3];
+							}
+							taSum.text = currFormatter.format(total);
+						}else{
+							taSum.text = total.toString();
+						}
+					}
+					catch (error:Error)
+					{
+						sumVisible = false;
+					}
+				}
+			}
+			
+			private function init():void
+			{
+				_resultsGrid = resultsGrid;
+			}
+			
+			public function get datagrid():DataGrid
+			{
+				return _resultsGrid;
+			}
+			
+			private function closeMe():void
+			{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function onItemRollOver(event:ListEvent):void
+            {  
+            	highlightedGraphic = findGraphicByAttribute(event.itemRenderer.data.gid)
+            	var vSW:SearchWidget = _bWidget as SearchWidget;
+				vSW.highlightDataGroupItem(highlightedGraphic);
+            	highlightedGraphic = findGraphicByAttribute(event.itemRenderer.data.gid)
+				if(highlightedGraphic){
+            		var infoData:Object = highlightedGraphic.attributes;
+					if (map.extent.containsXY(infoData.point.x, infoData.point.y)){
+						showInfoWindow(infoData);
+					}else{
+						hideInfoWindow();
+					}
+				}
+            }
+			
+			private function hideInfoWindow():void
+			{
+				if (map.infoWindow.contentOwner &&
+					((map.infoWindow.contentOwner is Graphic && Graphic(map.infoWindow.contentOwner).graphicsLayer === _graLyr) || map.infoWindow.contentOwner is Map))
+				{
+					map.infoWindow.hide();
+				}
+			}
+			
+			private function showInfoWindow(infoData:Object):void
+			{
+				var showHighlightPoint:MapPoint = infoData.point as MapPoint;
+				
+				popUpRenderer.popUpInfo = configurePopUpInfo(infoData.graphic.attributes.link);
+				popUpRenderer.graphic = infoData.graphic;
+				
+				map.infoWindow.content = popUpRenderer;
+				map.infoWindow.contentOwner = popUpRenderer.graphic;
+				map.infoWindow.show(showHighlightPoint);
+			}
+			
+			private function configurePopUpInfo(link:String):PopUpInfo
+			{
+				var popUpInfo:PopUpInfo = new PopUpInfo;
+				
+				popUpInfo.title = "{title}";
+				popUpInfo.description = "{content}";
+				
+				if (link)
+				{
+					var pos:Number = link.length - 4;
+					var sfx:String = link.substr(pos, 4).toLowerCase();
+					if ((sfx == ".jpg") || (sfx == ".png") || (sfx == ".gif")) // use PopUpMediaInfo if it is an image
+					{
+						var popUpMediaInfo:PopUpMediaInfo = new PopUpMediaInfo;
+						popUpMediaInfo.type = PopUpMediaInfo.IMAGE;
+						popUpMediaInfo.imageLinkURL = link;
+						popUpMediaInfo.imageSourceURL = link;
+						popUpInfo.popUpMediaInfos = [ popUpMediaInfo ];
+					}
+					else
+					{
+						popUpInfo.description += "<br/><a href='{link}'>{link}</a>"
+					}
+				}
+				
+				return popUpInfo;
+			}
+            
+            private function highLightSel(event:Event):void
+            {
+            	resultsGrid.selectedItem
+            	if(resultsGrid.selectedItem){
+	            	highlightedGraphic = findGraphicByAttribute(resultsGrid.selectedItem.gid)
+					var vSW:SearchWidget = _bWidget as SearchWidget;
+					vSW.highlightDataGroupItem(highlightedGraphic);
+            	}
+            }
+            
+            private function unhighLightSel(event:Event):void
+            {
+            	if(resultsGrid.selectedItem){
+            		highlightedGraphic = findGraphicByAttribute(resultsGrid.selectedItem.gid);
+            		var vSW:SearchWidget = _bWidget as SearchWidget;
+					vSW.unhighlightDataGroupItems();
+            	}
+            }
+            
+            private function onItemRollOut(event:ListEvent):void
+            {
+            	highlightedGraphic = findGraphicByAttribute(event.itemRenderer.data.gid)
+				var vSW:SearchWidget = _bWidget as SearchWidget;
+				vSW.unhighlightDataGroupItems();
+				hideInfoWindow();
+            }
+
+            public function findGraphicByAttribute(attributes:Object):Graphic
+            {
+                for each( var graphic:Graphic in _graLyr.graphicProvider)
+                {
+                    if ( graphic.attributes.gid === attributes)
+                    { 
+                        return graphic;
+                    }
+                }            
+                return null;
+            }
+            
+            private function clickRow(event:ListEvent):void
+            {            		
+            	highlightedGraphic = findGraphicByAttribute(event.itemRenderer.data.gid)
+            	var infoData:Object = highlightedGraphic.attributes;
+				var pt:MapPoint = infoData.point;
+				var map:Map = ViewerContainer.getInstance().mapManager.map;
+				if (infoData.geometry)
+				{
+					if (infoData.geometry.type == Geometry.MAPPOINT)
+					{
+						if (map.scale > _zoomScale)
+						{
+							map.scale = _zoomScale;
+						}
+						
+						map.centerAt(infoData.point);
+					}
+					else
+					{
+						if(isNaN(_zoomScale)){
+							map.extent = infoData.geometry.extent;
+							
+							if (!map.extent.contains(infoData.geometry))
+							{
+								map.level--;
+							}
+						}else{
+							if (map.scale > _zoomScale)
+							{
+								map.scale = _zoomScale;
+							}
+							
+							map.centerAt(infoData.point);
+						}
+					}
+				}
+            }
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:RadioButtonGroup id="optiongroup"/>
+	</fx:Declarations>
+	<mx:DataGrid id="resultsGrid" height="100%" width="100%"
+					  itemRollOver="onItemRollOver(event)"
+					  itemRollOut="onItemRollOut(event)" 
+					  itemClick="clickRow(event)"
+					  rollOut="highLightSel(event)" 
+					  rollOver="unhighLightSel(event)"
+					  wordWrap="false"
+					  horizontalScrollPolicy="auto"/>
+	<Search:controlBarContent>
+		<s:HGroup verticalAlign="middle" paddingLeft="4" >
+			<s:Label id="lblSum" text="{_labelSum}" visible="{sumVisible}" includeInLayout="{sumVisible}"/>
+			<s:TextArea id="taSum" heightInLines="1" editable="false" borderVisible="false" visible="{sumVisible}" includeInLayout="{sumVisible}"/>
+			<s:RadioButton label="{_exp2csvBtnLbl}" groupName="optiongroup" selected="true" visible="{_enableExport}" includeInLayout="{_enableExport}"/>
+			<s:RadioButton label="{_exp2txtBtnLbl}" groupName="optiongroup" visible="{_enableExport}" includeInLayout="{_enableExport}"/>
+			<s:Button label="{_exportButtonLbl}" id="Export" click="exportTo(event)" skinClass="widgets.eSearch.ExportButtonSkin" visible="{_enableExport}" includeInLayout="{_enableExport}"/>
+		</s:HGroup>
+	</Search:controlBarContent>
+	<Search:controlBarLayout>
+		<s:HorizontalLayout horizontalAlign="right" paddingTop="3" paddingBottom="2" paddingRight="5" clipAndEnableScrolling="true" />
+	</Search:controlBarLayout>
+</Search:ResizeTitleWindow>

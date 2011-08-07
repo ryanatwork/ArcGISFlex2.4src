@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" 
+	implements="mx.controls.listClasses.IDropInListItemRenderer, mx.core.IFactory"
+	horizontalScrollPolicy="off"
+    verticalScrollPolicy="off">
+	
+	<mx:Script>
+		<![CDATA[
+		import mx.controls.dataGridClasses.DataGridListData;
+		import mx.controls.listClasses.BaseListData;
+		import flash.events.Event;
+        import flash.net.URLRequest;
+        import mx.controls.DataGrid;
+		
+		private var u:URLRequest;
+		
+		// Make the listData property bindable.
+    	[Bindable("dataChange")]
+		private var _listData : BaseListData;
+		[Bindable]
+		private var dg:DataGrid;
+		
+		public function newInstance():*
+		{
+		   return new HyperLinkColumn();
+		}
+  		
+		public function get listData() : BaseListData
+		{
+			return _listData;            
+		}                                        
+	
+		public function set listData( value : BaseListData ) : void
+		{
+			_listData = value;
+			chkbox.label = listData.label;
+			dg = listData.owner as DataGrid;
+		}
+		
+		// Event handler to open URL using navigateToURL().
+        private function handleClick(eventObj:Event):void {
+            u = new URLRequest(data[(DataGridListData(listData).dataField)]);
+            navigateToURL(u);
+        }
+        
+        private function sel():void
+        {
+        	chkbox.setStyle("textRollOverColor",dg.getStyle("textRollOverColor"));
+        	if (dg.isItemHighlighted(DataGridListData(listData))){
+        		chkbox.setStyle("color",dg.getStyle("textRollOverColor"));
+        	} else if (dg.isItemSelected(DataGridListData(listData))) {
+        		chkbox.setStyle("color",dg.getStyle("textSelectedColor"));
+        	} else {
+        		chkbox.setStyle("color",dg.getStyle("color"));
+        	}
+        }
+        
+		]]>
+	</mx:Script>
+	<mx:CheckBox
+			id="chkbox"
+            fontWeight="bold" 
+            buttonMode="true" 
+            useHandCursor="true"
+            toolTip="Click to open hyperlink"
+            click="handleClick(event)"
+            selected="{(dg.selectedItem == data)}"
+            x="-14" 
+            render="sel()"/>
+</mx:Canvas>
