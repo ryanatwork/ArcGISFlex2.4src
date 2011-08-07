@@ -1,15 +1,13 @@
-==========================
-ArcGIS Viewer for Flex 2.4
+# ArcGIS Viewer for Flex 2.4
 build date 2011-07-25
-==========================
+----------------------------
 
 This file contains the complete source code for the ArcGIS Viewer for Flex 2.4.
 
-============================
 Getting Started - Developers
-============================
+----------------------------
 
-See http://links.esri.com/flexviewer-gettingstarted-developers
+See [http://links.esri.com/flexviewer-gettingstarted-developers](http://links.esri.com/flexviewer-gettingstarted-developers)
 
 1. in Flash Builder 4, Go to File Menu -> Import -> Flash Builder project.
 
@@ -46,11 +44,10 @@ Optionally:
 7. Browser will open and Flex Viewer application will be displayed.
 
 
-================
 More Information
-================
+----------------
 
-Flex Viewer: http://help.arcgis.com/en/webapps/flexviewer/index.html
-Flex API http://help.arcgis.com/en/webapi/flex/index.html
+Flex Viewer: [http://help.arcgis.com/en/webapps/flexviewer/index.html](http://help.arcgis.com/en/webapps/flexviewer/index.html)
+Flex API [http://help.arcgis.com/en/webapi/flex/index.html](lhttp://help.arcgis.com/en/webapi/flex/index.html)
 
-Flex Viewer License agreement at http://www.esri.com/legal/pdfs/mla_e204_e300/english.pdf
+Flex Viewer License agreement at [http://www.esri.com/legal/pdfs/mla_e204_e300/english.pdf]( http://www.esri.com/legal/pdfs/mla_e204_e300/english.pdf)
