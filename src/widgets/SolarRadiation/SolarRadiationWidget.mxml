@@ -1,0 +1,624 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+////////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2010 ESRI
+//
+// All rights reserved under the copyright laws of the United Statfes.
+// You may freely redistribute and use this software, with or
+// without modification, provided you include the original copyright
+// and use restrictions.  See use restrictions in the file:
+// <install location>/License.txt
+//
+////////////////////////////////////////////////////////////////////////////////
+-->
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009"
+				   xmlns:s="library://ns.adobe.com/flex/spark"
+				   xmlns:mx="library://ns.adobe.com/flex/mx"
+				   xmlns:esri="http://www.esri.com/2008/ags"
+				   xmlns:viewer="com.esri.viewer.*"
+				   widgetConfigLoaded="init()">
+	
+	<viewer:states>
+		<s:State name="idTools"/>
+		<s:State name="idCalc"/>
+	</viewer:states>
+	
+	<viewer:transitions>
+		<s:Transition autoReverse="true" toState="*">
+			<s:Fade targets="{[idTools, idCalc]}"/>
+		</s:Transition>
+	</viewer:transitions>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.Map;
+			import com.esri.ags.events.DrawEvent;
+			import com.esri.ags.events.GeometryServiceEvent;
+			import com.esri.ags.events.GeoprocessorEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.Polygon;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.tasks.QueryTask;
+			import com.esri.ags.tasks.supportClasses.AreasAndLengthsParameters;
+			import com.esri.ags.tasks.supportClasses.JobInfo;
+			import com.esri.ags.tasks.supportClasses.ParameterValue;
+			import com.esri.ags.tasks.supportClasses.Query;
+			import com.esri.ags.tools.DrawTool;
+			
+			import mx.collections.*;
+			import mx.controls.Alert;
+			import mx.events.ItemClickEvent;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			
+			//labels
+			private var toolsLabel:String;
+			
+			private var calcLabel:String;
+			
+			[Bindable]
+			private var descriptionLabel:String;
+			
+			[Bindable]
+			private var rectangleLabel:String;
+			
+			[Bindable]
+			private var pointLabel:String;
+			
+			[Bindable]
+			private var polygonLabel:String;
+			
+			[Bindable]
+			private var clearLabel:String;	
+			
+			private var loadingLabel:String;
+			
+			private var chartLabel:String;
+			
+			private var graphicsLayer:GraphicsLayer;
+			
+			private var rooftopLayer:String;
+			
+			private var useAMF:String;
+			
+			private var gpGeometry:Geometry;
+			
+			private var lineSym:SimpleLineSymbol = new SimpleLineSymbol("solid", 0xFF0000, 0.8, 2);
+			
+			private var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", 0xFF0000, 0.3, lineSym);
+			
+			[Bindable]
+			private var msgVisible:Boolean = false;
+			
+			private var conversionFactor:Number;
+			
+			[Bindable]
+			private var totalRoofArea:Number = 0;
+			
+			[Bindable]
+			private var useableRoofArea:Number = 0;
+			
+			[Bindable]
+			private var systemSize:Number = 0;
+			
+			[Bindable]
+			private var incomingRadiation:Number = 0;
+			
+			[Bindable]
+			private var annualOutput:Number = 0;
+			
+			[Bindable]
+			private var costSavings:Number = 0;
+			
+			[Bindable]
+			private var co2Savings:Number = 0;
+			
+			
+			private const ICON_URL:String = "assets/images/";	
+			
+			
+			
+			private function init():void
+			{
+				graphicsLayer = new GraphicsLayer();
+				graphicsLayer.symbol = polySym;
+				map.addLayer(graphicsLayer);
+				if (configXML)
+				{
+					//labels
+					toolsLabel = configXML.labels.toolslabel || "Tools";
+					calcLabel = configXML.labels.calclabel || "Calculations";
+					descriptionLabel = configXML.labels.descriptionlabel || "Use a tool to select a rooftop or define an area";
+					pointLabel = configXML.labels.pointlabel || "Select Rooftop";
+					polygonLabel = configXML.labels.polygonlabel || "Define Area";
+					clearLabel = configXML.labels.clearlabel || "Clear";
+					loadingLabel = configXML.labels.loadinglabel || "Calculating Solar Potential...";
+					chartLabel = configXML.labels.chartlabel || "Annual Solar Radiation: ";
+					
+					rooftopLayer = configXML.rooftoplayer || "";
+					if (rooftopLayer == "")
+						pointTool.visible = false;
+					gpService.url = configXML.gpservice;
+					geomService.url = configXML.geometryservice;
+					conversionFactor = Number(configXML.conversionfactor) || 1;
+					useAMF = configXML.useAMF;
+				}
+				wTemplate.addTitlebarButton(ICON_URL + "i_sun.png", toolsLabel, showStateTools);	
+				wTemplate.addTitlebarButton(ICON_URL + "i_piechart.png", calcLabel, showStateCalc);
+				
+				
+			}	
+			
+			
+			private function showMessage(msg:String, swfVisible:Boolean):void
+			{
+				txtMessage.text = msg;
+				swfMessage.visible = swfVisible;
+				msgVisible = true;
+			}			
+			
+			private function clearMessage():void
+			{
+				msgVisible = false;
+			}	
+			
+			private function activateTool(value:String):void
+			{
+				var status:String;
+				switch (value)
+				{	
+					case DrawTool.MAPPOINT:
+					{
+						status = pointLabel;
+						break;
+					}			
+					case DrawTool.POLYGON:
+					{
+						status = polygonLabel;
+						break;
+					}
+				}
+				setMapAction(value, status, null, drawEnd);;	
+				
+			}
+			
+	
+			private function clear():void
+			{
+				graphicsLayer.clear();
+				clearCalculations();
+				clearMessage();
+			}			
+			
+			private function drawEnd(event:DrawEvent):void
+			{
+				graphicsLayer.clear();
+				var geom:Geometry = event.graphic.geometry;
+				
+				switch (geom.type)
+				{
+					case Geometry.MAPPOINT:
+					{
+						queryRooftopFeature(geom);
+						break;
+					}
+					case Geometry.POLYGON:
+					{
+						graphicsLayer.add(event.graphic)
+						var polygon:Polygon = event.graphic.geometry as Polygon;
+						geomService.simplify([ polygon ]);
+						break;
+					}
+				}
+				
+			}
+			
+			//========================
+			//ROOFTOP
+			
+			//query rooftop feature
+			private function queryRooftopFeature(geom:Geometry):void
+			{
+				if (rooftopLayer)
+				{
+					var queryTask:QueryTask = new QueryTask(rooftopLayer);
+							
+					//Need useAMF=false for severs running 9.3
+					if (useAMF)
+					{
+						queryTask.useAMF = useAMF == "true";
+					}
+					
+							
+					queryTask.disableClientCaching = true;
+					var query:Query = new Query();
+					query.geometry = geom;
+					query.outFields = ["*"];
+					query.returnGeometry = true;
+					query.spatialRelationship = "esriSpatialRelIntersects";
+					query.outSpatialReference = map.spatialReference;
+					queryTask.execute(query, new AsyncResponder(onQueryResult, onQueryFault));  
+					showMessage(loadingLabel, true); 
+					
+					// on query result
+					function onQueryResult(featureSet:FeatureSet, token:Object = null):void                
+					{   
+						if (featureSet.features.length > 0)
+						{
+							var graphic:Graphic = featureSet.features[0];
+							graphicsLayer.add(graphic);
+							var attributes:Object = graphic.attributes;
+							totalRoofArea = attributes.Shape_Area * conversionFactor;
+							parseRadiationAttributes(attributes);
+						}
+						else
+						{
+							clearCalculations();
+							showMessage("No rooftops selected.", false);
+						}	
+					}
+					
+					//on query fault
+					function onQueryFault(info:Object, token:Object = null) : void
+					{                    
+						showMessage(info.toString(), false);         
+					}
+				}  
+				
+			}				
+			
+			
+			private function simplifyCompleteHandler(event:GeometryServiceEvent):void
+			{
+				
+				gpGeometry = (event.result[0] as Geometry);
+				
+				if (gpGeometry.type == Geometry.POLYGON)
+				{
+					var areasAndLengthsParameters:AreasAndLengthsParameters = new AreasAndLengthsParameters();
+					areasAndLengthsParameters.areaUnit = GeometryService.UNIT_SQUARE_FEET;
+					areasAndLengthsParameters.polygons = [ gpGeometry ];
+					
+					geomService.areasAndLengths(areasAndLengthsParameters);
+					
+				}
+				else
+				{
+					Alert.show("User graphic was not a polygon.\nPlease draw a polygon area.","Define Area");
+				}
+				
+			}
+			
+			private function areaLengthsCompleteHandler(event:GeometryServiceEvent):void
+			{
+				var area:Number = event.result.areas[0];
+				var area_m2:Number =  area * conversionFactor; // convert to m2
+				
+				// check geometry for reasonable area
+				if (area_m2 >= 5000)
+				{
+					Alert.show("Area exceeds 5000 m2.\nPlease draw a smaller area.","Define Area");
+				} 
+				else
+				{
+					totalRoofArea = area_m2;
+					runGPTask(gpGeometry as Polygon);
+				}
+			}
+			
+			private function runGPTask(poly:Polygon):void
+			{  
+			
+				var featureSet:FeatureSet = new FeatureSet([]);
+				featureSet.features.push({geometry:poly});
+				showMessage(loadingLabel, true);
+				var params:Object = 
+					{
+						"Input_Feature": featureSet, 
+						"env:outSR": map.spatialReference.wkid
+					}
+				gpService.execute(params);
+			}			 
+			
+			private function onGPComplete(event:GeoprocessorEvent):void
+			{ 
+				var graphic:Graphic = event.executeResult.results[0].value.features[0];
+			
+				var attributes:Object = graphic.attributes;
+				parseRadiationAttributes(attributes);  
+			}
+			
+			private function parseRadiationAttributes(attributes:Object):void
+			{
+				var t0:Number = Number(attributes.T0 / 1000);
+				var t1:Number = Number(attributes.T1 / 1000);
+				var t2:Number = Number(attributes.T2 / 1000);
+				var t3:Number = Number(attributes.T3 / 1000);
+				var t4:Number = Number(attributes.T4 / 1000);
+				var t5:Number = Number(attributes.T5 / 1000);
+				var t6:Number = Number(attributes.T6 / 1000);
+				var t7:Number = Number(attributes.T7 / 1000);
+				var t8:Number = Number(attributes.T8 / 1000);
+				var t9:Number = Number(attributes.T9 / 1000);
+				var t10:Number = Number(attributes.T10 / 1000);
+				var t11:Number = Number(attributes.T11 / 1000);
+				
+				incomingRadiation = t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8 + t9 + t10 + t11;
+				
+				var radiationArray:ArrayCollection = new ArrayCollection();     
+				radiationArray.addItem({sample:"Jan",value:t0});
+				radiationArray.addItem({sample:"Feb",value:t1});
+				radiationArray.addItem({sample:"Mar",value:t2});
+				radiationArray.addItem({sample:"Apr",value:t3});
+				radiationArray.addItem({sample:"May",value:t4});
+				radiationArray.addItem({sample:"Jun",value:t5});
+				radiationArray.addItem({sample:"Jul",value:t6});
+				radiationArray.addItem({sample:"Aug",value:t7});
+				radiationArray.addItem({sample:"Spt",value:t8});
+				radiationArray.addItem({sample:"Oct",value:t9});
+				radiationArray.addItem({sample:"Nov",value:t10});
+				radiationArray.addItem({sample:"Dec",value:t11});
+				
+				areaChart.dataProvider = radiationArray;
+				var msg:String = chartLabel + numberFormatter.format(incomingRadiation) + " kWh/m2";
+				showMessage(msg, false);
+				updateCalculations();
+			}
+			
+			private function updateCalculations():void
+			{
+				//useable roof area
+				useableRoofArea = totalRoofArea * sliderRoofPercent.value / 100;
+				
+				//system size
+				//kW = USEABLE ROOF AREA (m2) * PANEL OUTPUT (126.98 W/m2) / 1000
+				systemSize = useableRoofArea * 126.98 / 1000
+				
+				//annual output
+				//kWh/yr = SOLAR RADIATION (kWh/m2) * USEABLE AREA (m2) * PANEL EFFICIENCY ( 0.12698 or 0.079) * OTHER EFFICIENCIES (0.87) -->										
+				annualOutput = incomingRadiation * useableRoofArea * 0.12698 * 0.87;
+				
+				//cost savings
+				//$0.18 per kWh
+				costSavings = annualOutput * 0.18;
+				
+				//co2 savings
+				//1,146 per MWh or 1.146 per kWh
+				co2Savings = annualOutput * 1.146
+			}
+			
+			private function clearCalculations():void
+			{
+				//total roof area
+				totalRoofArea = 0;
+				
+				//useable roof area
+				useableRoofArea = 0;
+				
+				//system size
+				systemSize = 0
+				
+				//incoming radiation
+				incomingRadiation = 0;
+				
+				//annual output
+				annualOutput = 0;
+				
+				//cost savings
+				costSavings = 0;
+				
+				//co2 savings
+				co2Savings = 0;
+				
+				areaChart.dataProvider = null;
+			}
+			
+			private function onFault(event:FaultEvent ) : void
+			{
+				showMessage(String(event), false);
+			}			
+			
+			private function widgetClosedHandler(event:Event):void
+			{
+				graphicsLayer.visible = false;
+				setMapNavigation(null, null);
+			}			
+			
+			private function widgetOpenedHandler(event:Event):void
+			{
+				if (graphicsLayer)
+				{
+					graphicsLayer.visible = true;
+				}
+			}
+			
+			
+			private function showStateTools():void
+			{
+			
+				this.currentState = "idTools";
+				wTemplate.selectedTitlebarButtonIndex = 0; // used to indicate selected titlebar button when automatically switching state
+			}
+				
+			private function showStateCalc():void
+			{
+			
+				this.currentState = "idCalc";
+			
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<mx:SeriesSlide id="slideUp" duration="1000" direction="up"/>
+		<mx:SeriesSlide id="slideDown" duration="1000" direction="down"/>
+		
+		<!-- FORMATTERS -->
+		<mx:NumberFormatter id="numberFormatter" useThousandsSeparator="true" precision="1"/>
+		<mx:NumberFormatter id="currencyFormatter" useThousandsSeparator="true" precision="2"/>
+		<mx:NumberFormatter id="integerFormatter" useThousandsSeparator="true" precision="0"/>
+		
+		<!-- GP SERVICE -->				
+		<esri:Geoprocessor		id="gpService" 
+								showBusyCursor="true"
+								executeComplete="onGPComplete(event)"
+								fault="onFault(event)"
+								useAMF="false"
+								/>
+		
+		<!-- GEOMETRY SERVICE -->
+		<esri:GeometryService	id="geomService"
+								showBusyCursor="true"
+								simplifyComplete="simplifyCompleteHandler(event)"
+								areasAndLengthsComplete="areaLengthsCompleteHandler(event)" 
+								fault="onFault(event)"/>
+		
+	</fx:Declarations>
+	
+	
+	
+	
+	
+	<viewer:WidgetTemplate id="wTemplate" height="320" width="350" closed="widgetClosedHandler(event)" open="widgetOpenedHandler(event)">
+		<s:Group id="idTools"
+				 width="100%" height="100%"
+				 visible="false"
+				 visible.idTools="true">
+			<s:layout>
+				<s:VerticalLayout gap="10"
+								  horizontalAlign="center"
+								  paddingTop="10"/>
+			</s:layout>
+			
+				<mx:Text text="{descriptionLabel}" styleName="WidgetText" width="100%" textAlign="center"/>
+				<mx:HBox horizontalAlign="center" width="100%" horizontalGap="15">
+					<mx:Image id="pointTool" click="{activateTool(DrawTool.MAPPOINT)}" source="assets/images/i_roof_point.png" useHandCursor="true" buttonMode="true" toolTip="{pointLabel}" width="40" height="40"/>
+					<mx:Image click="{activateTool(DrawTool.POLYGON)}" source="assets/images/i_draw_poly.png" useHandCursor="true" buttonMode="true" toolTip="{polygonLabel}" width="40" height="40"/>
+					<mx:Image click="clear()" source="assets/images/i_clear.png" useHandCursor="true" buttonMode="true" toolTip="{clearLabel}" width="40" height="40"/>
+				</mx:HBox>
+				<mx:HBox id="boxMessage" width="100%" visible="{msgVisible}" includeInLayout="{msgVisible}" horizontalAlign="center">
+					<mx:SWFLoader id="swfMessage" source="assets/images/loader.swf" visible="false" />
+					<mx:Text id="txtMessage" text="" styleName="WidgetText" horizontalCenter="0" width="90%"/>
+				</mx:HBox>
+				<mx:AreaChart id="areaChart" height="100%" width="100%" showDataTips="true" color="#FFFFFF">
+					<mx:horizontalAxis>
+						<mx:CategoryAxis title="Month" categoryField="sample"/>
+					</mx:horizontalAxis>
+					<mx:series>
+						<mx:AreaSeries 	id="areaSeries"
+										showDataEffect="slideUp" 
+										hideDataEffect="slideDown"
+										yField="value" 
+										form="curve" 
+										displayName="Monthly Solar Radiation (kWH/m2)"/>
+					</mx:series>
+				</mx:AreaChart>   
+	
+		</s:Group>
+		
+		<s:Group id="idCalc"
+				 width="100%" height="100%"
+				 visible="false"
+				 visible.idCalc="true">
+			<s:layout>
+				<s:VerticalLayout gap="10"
+								  horizontalAlign="center"
+								  paddingTop="10"/>
+			</s:layout>
+				<mx:Grid width="100%" styleName="WidgetText">
+					
+					<!-- TOTAL ROOF AREA -->
+					<mx:GridRow width="100%"  backgroundColor="#000000" backgroundAlpha="0.3">
+						<mx:GridItem width="100%" horizontalAlign="right">
+							<mx:Label text="Total Roof Area (m2):"/>
+						</mx:GridItem>
+						<mx:GridItem width="100%">
+							<mx:Label text="{numberFormatter.format(totalRoofArea)}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<!-- USEABLE ROOF PERCENT -->
+					<mx:GridRow width="100%">
+						<mx:GridItem width="100%" horizontalAlign="right">
+							<mx:Label text="Useable Roof Percent ({integerFormatter.format(sliderRoofPercent.value)}%):"/>
+						</mx:GridItem>
+						<mx:GridItem width="100%">
+							<mx:HSlider width="100" value="40" id="sliderRoofPercent" minimum="5" maximum="75" snapInterval="5" liveDragging="true" change="updateCalculations()"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<!-- USEABLE ROOF AREA -->
+					<mx:GridRow width="100%" backgroundColor="#000000" backgroundAlpha="0.3">
+						<mx:GridItem width="100%" horizontalAlign="right">
+							<mx:Label text="Useable Roof Area (m2):" />
+						</mx:GridItem>
+						<mx:GridItem width="100%">
+							<mx:Label text="{numberFormatter.format(useableRoofArea)}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<!-- POTENTIAL SYSTEM SIZE -->
+					<mx:GridRow width="100%">
+						<mx:GridItem horizontalAlign="right" width="100%">
+							<mx:Label text="Potential System Size (kW):"/>
+						</mx:GridItem>
+						<mx:GridItem width="100%">
+							<mx:Label text="{numberFormatter.format(systemSize)}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<!-- INCOMING SOLAR RADIATION -->
+					<mx:GridRow width="100%" backgroundColor="#000000" backgroundAlpha="0.3">
+						<mx:GridItem width="100%" horizontalAlign="right">
+							<mx:Label text="Incoming Solar Radiation (kWh/m2):"/>
+						</mx:GridItem>
+						<mx:GridItem width="100%">
+							<mx:Label text="{numberFormatter.format(incomingRadiation)}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<!-- POTENTIAL ANNUAL OUTPUT -->
+					<mx:GridRow width="100%">
+						<mx:GridItem width="100%" horizontalAlign="right">
+							<mx:Label text="Potential Annual Output (kWh/yr):"/>
+						</mx:GridItem>
+						<mx:GridItem width="100%">
+							<mx:Label text="{numberFormatter.format(annualOutput)}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<!-- COST SAVINGS -->
+					<mx:GridRow width="100%" backgroundColor="#000000" backgroundAlpha="0.3"> 
+						<mx:GridItem width="100%" horizontalAlign="right">
+							<mx:Label text="Potential Annual Cost Savings:"/>
+						</mx:GridItem>
+						<mx:GridItem width="100%">
+							<mx:Label text="$ {currencyFormatter.format(costSavings)}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<!-- CO2 SAVINGS -->
+					<mx:GridRow width="100%">
+						<mx:GridItem width="100%" horizontalAlign="right">
+							<mx:Label text="Potential Annual CO2 Savings (lbs):"/>
+						</mx:GridItem>
+						<mx:GridItem width="100%">
+							<mx:Label text="{numberFormatter.format(co2Savings)}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+				</mx:Grid>
+		</s:Group>
+		
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

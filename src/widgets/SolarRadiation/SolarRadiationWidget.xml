@@ -1,0 +1,29 @@
+<?xml version="1.0" ?>
+<!--
+////////////////////////////////////////////////////////////////////////////////
+//
+// Copyright © 2008 ESRI
+//
+// All rights reserved under the copyright laws of the United States.
+// You may freely redistribute and use this software, with or
+// without modification, provided you include the original copyright
+// and use restrictions.  See use restrictions in the file:
+// <install location>/FlexViewer/License.txt
+//
+////////////////////////////////////////////////////////////////////////////////
+-->
+<configuration>
+	<rooftoplayer>http://140.241.251.197/ArcGIS/rest/services/maps/Rooftop_Isolation_tiled/MapServer/1</rooftoplayer>
+	<gpservice>http://140.241.251.197/ArcGIS/rest/services/tools/SolarBoston/GPServer/RooftopSolarCalculator</gpservice>
+	<geometryservice>http://140.241.251.197/ArcGIS/rest/services/Geometry/GeometryServer</geometryservice>
+	<conversionfactor>0.092903</conversionfactor> <!-- factor to convert area of polygon from map units to square meters -->
+	<useAMF>false</useAMF> <!-- set this to false if using ArcGIS Server 9.3, not required for version 10.0 -->
+	<labels>
+		<descriptionlabel>Use a tool to select a rooftop or define an area</descriptionlabel>
+		<pointlabel>Select Rooftop</pointlabel>
+		<polygonlabel>Define Area</polygonlabel>
+		<clearlabel>Clear</clearlabel>
+		<loadinglabel>Calculating Solar Potential...</loadinglabel>
+		<chartlabel>Annual Solar Radiation: </chartlabel>
+	</labels>
+</configuration>
