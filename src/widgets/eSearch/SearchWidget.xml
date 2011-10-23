@@ -8,30 +8,6 @@
 		<layer>
 			<definitionexpression></definitionexpression>
 			<enableexport>true</enableexport>
-			<name>Guardrails</name>
-			<url>http://gis.calhouncounty.org/ArcGIS/rest/services/Highway/MapServer/4</url>
-			<expressions>
-				<expression alias="Guardrails" textsearchlabel="Search Guardrial by Type..." field="Type" usedomain="true">Type = '[value]'</expression>
-			</expressions>
-			<graphicalsearchlabel>Use one of the graphical search tools to select Guardrial</graphicalsearchlabel>
-			<spatialsearchlayer>true</spatialsearchlayer>
-			<titlefield>ID</titlefield>
-			<fields all="false">
-				<field name="Type" gridfield="true"/>
-				<field name="Road_ID" gridfield="true"/>
-				<field name="Comments" gridfield="true"/>
-				<field name="Type_start_a" gridfield="true"/>
-				<field name="Type_end_a" gridfield="true"/>
-				<field name="ID" gridfield="true"/>
-			</fields>
-			<linkfield></linkfield>
-			<icon isfield="false"></icon>
-			<zoomscale usegeometry="true"/>
-			<autoopendatagrid>true</autoopendatagrid>
-		</layer>
-		<layer>
-			<definitionexpression></definitionexpression>
-			<enableexport>true</enableexport>
             <name>Louisville Zoning</name>
             <url>http://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Louisville/LOJIC_LandRecords_Louisville/MapServer/2</url>
             <expressions>
@@ -45,7 +21,7 @@
             <linkfield linkprefix="" linksuffix=""></linkfield>
 			<icon isfield="true" iconprefix="" iconsuffix=""></icon>
             <fields all="true" />
-            <zoomscale usegeometry="false">5000</zoomscale>
+            <zoomscale usegeometry="true">10000</zoomscale>
         </layer>
 		<layer>
 			<definitionexpression></definitionexpression>
@@ -53,7 +29,7 @@
 			<name>Parcels</name>
 			<url>http://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Louisville/LOJIC_LandRecords_Louisville/MapServer/0</url>
 			<expressions>
-				<expression alias="Parcel ID" textsearchlabel="Search by Parcel ID  [ Example: 181001490000 ]:">PARCELID = '[value]'</expression>
+				<expression alias="Parcel ID" textsearchlabel="Search by Parcel ID  [ Example: 181001490000 ]:" userlist="1234,1998,1990">PARCELID = '[value]'</expression>
 			</expressions>
 			<graphicalsearchlabel>Use one of the graphical search tools to select parcels</graphicalsearchlabel>
 			<spatialsearchlayer>true</spatialsearchlayer>
@@ -63,7 +39,7 @@
             </fields>
 			<linkfield></linkfield>
 			<icon isfield="true"></icon>
-			<zoomscale>40000</zoomscale>
+			<zoomscale usegeometry="true">40000</zoomscale>
 		</layer>
 		<layer>
 			<definitionexpression></definitionexpression>
@@ -82,7 +58,7 @@
             </fields>
 			<linkfield></linkfield>
 			<icon isfield="true"></icon>
-			<zoomscale>1000</zoomscale>
+			<zoomscale usegeometry="true">1000</zoomscale>
 		</layer>
 		<layer>
 			<definitionexpression></definitionexpression>
@@ -99,13 +75,13 @@
 				<field name="DESCRIPTION" alias="Description" gridfield="true"/>
 				<field name="URL" alias="Show Image" hyperlinkgridfield="true" hyperlinkaliastext="Get Traffic Image"/>
 				<field name="ONLINE" alias="Online" gridfield="true" gridfieldonly="true"/>
-				<field name="LAST_UPDATED" alias="Last Updated" gridfield="true" gridfieldonly="true"/>
+				<field name="LAST_UPDATED" alias="Last Updated" gridfield="true" gridfieldonly="true" dateformat="MM/DD/YYYY" useutc="true"/>
 			</fields>
 			<linkfield>URL</linkfield>
 			<icon isfield="false">assets/images/i_camera.png</icon>
 			<zoomscale>5000</zoomscale>
 		</layer>
-		<layer>
+		<!--<layer>
 			<definitionexpression/>
 			<name>Weather Obs</name>
 			<enableexport>true</enableexport>
@@ -117,14 +93,14 @@
 			<spatialsearchlayer>false</spatialsearchlayer>
 			<titlefield>Type</titlefield>
 			<fields all="false">
-				<field name="URL" alias="Website Link" hyperlinkgridfield="true" linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=""/>
+				<field name="URL" alias="Website Link" hyperlinkgridfield="true" linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=".aspx"/>
 				<field name="Type" gridfield="true"/>
 				<field name="Temp" gridfield="true"/>
 			</fields>
-			<linkfield linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=".jpg">URL</linkfield>
+			<linkfield linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=".apsx" linkaliastext="Get Site Info">URL</linkfield>
 			<icon isfield="true"/>
 			<zoomscale>5000</zoomscale>
-		</layer>
+		</layer>-->
 		<!--<layer>
 			<definitionexpression></definitionexpression>
 			<name>Owner Parcels</name>
@@ -146,7 +122,7 @@
 				<field name="parcels2.ADDRESS_1" gridfield="true" gridfieldonly="true" />
 				<field name="parcels2.ADDRESS_3" gridfield="true" gridfieldonly="true" />
 				<field name="parcels2.PRIOR_TAX_YEAR" gridfield="true" />
-				<field name="parcels2.SALE_DATE" gridfield="true" dateformat="MM/DD/YYYY"/>
+				<field name="parcels2.SALE_DATE" gridfield="true" dateformat="MM/DD/YYYY" useutc="true"/>
 				<field name="parcels2.LAST_DEED_BOOK" gridfield="true"/>
 				<field name="parcels2.LAST_DEED_PAGE" gridfield="true"/>
 				<field name="parcels2.ZIPCODE_1" gridfield="true" gridfieldonly="true"/>
@@ -157,7 +133,7 @@
 				<field name="parcels2.LAND_PRICE" gridfield="true" currencyformat="$|2|,|." />
 				<field name="parcels2.IMPR_PRICE" gridfield="true" currencyformat="$|2|,|." />
 				<field name="parcels2.ADJ_PRICE" gridfield="true" currencyformat="$|2|,|." />
-				<field name="parcels2.OVER_COND" alias="PAPA Website Link" hyperlinkgridfield="true" hyperlinkaliastext="Click here for document" linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=""/>
+				<field name="parcels2.OVER_COND" hyperlinkgridfield="true" hyperlinkaliastext="Click here for document" linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix=""/>
 				<field name="ADJUSTMENT PRICE" gridfield="true"/>
 			</fields>
 			<linkfield linkprefix="http://someWebSite/aspx/web/details.aspx?p_entity=" linksuffix="">parcels2.OVER_COND</linkfield>
@@ -166,12 +142,12 @@
 		</layer>-->
 	</layers>
 	<spatialrelationships>
-		<!-- possible spatial relationships		 
+		<!-- possible spatial relationships
 			esriSpatialRelIntersects | esriSpatialRelContains | esriSpatialRelCrosses | esriSpatialRelEnvelopeIntersects | esriSpatialRelIndexIntersects | esriSpatialRelOverlaps | esriSpatialRelTouches | esriSpatialRelWithin
-			
+
 			currently unavailable:
 				esriSpatialRelRelation
-		-->	
+		-->
 		<spatialrelationship>
 			<name>esriSpatialRelContains</name>
 			<label>entirely contained in</label>
@@ -197,17 +173,17 @@
 		<bufferunit>
 			<name>UNIT_METER</name>
 			<label>Meters</label>
-		</bufferunit>		
+		</bufferunit>
 		<bufferunit>
 			<name>UNIT_KILOMETER</name>
 			<label>Kilometers</label>
 		</bufferunit>
 	</bufferunits>
 	<tolerance>6</tolerance>
-	<spatialReference>102003</spatialReference>
+	<spatialreference>102003</spatialreference>
 	<zoomscale>2400</zoomscale>
 	<geometryservice>http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer</geometryservice>
-	<csvSeparator>,</csvSeparator>
+	<csvseparator>,</csvseparator>
 	<toleranceforpointgraphicalselection>3</toleranceforpointgraphicalselection><!-- value is in screen pixels -->
 	<disablebuttons></disablebuttons><!--possible values one or more not all three search types comma sepearted text,graphic,spatial,grid -->
 	<defaultselectionoption>textInput</defaultselectionoption><!--possible values only one graphicalInput or textInput or spatialInput -->
@@ -234,13 +210,13 @@
 		<clearlabel>Clear</clearlabel>
 		<loadinglabel>Loading...</loadinglabel>
 		<selectionlabel>Features Selected:</selectionlabel>
-		<gridresultsLabel>Show Results in Grid</gridresultsLabel>
+		<gridresultslabel>Show Results in Grid</gridresultslabel>
 		<csvdefaultname>Selected Records</csvdefaultname>
 		<exportbtnlabel>Export...</exportbtnlabel>
 		<export2csvoptionlabel>Export to CSV...</export2csvoptionlabel>
 		<export2txtoptionlabel>Export to Txt...</export2txtoptionlabel>
-		<bufferLabel>apply a search distance:</bufferLabel>
-		<spatialsearchLabel>Spatial search</spatialsearchLabel>
+		<bufferlabel>apply a search distance:</bufferlabel>
+		<spatialsearchlabel>Spatial search</spatialsearchlabel>
 		<applybufferlabel>Apply buffer</applybufferlabel>
 		<searchlayerlabel>Search entities of:</searchlayerlabel>
 		<enablemultipartsearch>enable multi-part graphics</enablemultipartsearch>
@@ -255,7 +231,7 @@
     	</simplefillsymbol>
     	<!-- You can have one or the other, either simplemarkersymbol or picturemarkersymbol
     	     defined for your point results NOT BOTH. picturemarkersymbol will override simplemarkersymbol
-    	     if you do not have it commented out. --> 
+    	     if you do not have it commented out. -->
     	<!--<simplemarkersymbol style="square" size="12" color="0xff0000" alpha="0.5" xoffset="0" yoffset="0" angle="0">
     		<outline style="solid" color="0x000000" alpha="1" width="1"/>
     	</simplemarkersymbol>-->

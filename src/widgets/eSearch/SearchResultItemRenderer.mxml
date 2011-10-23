@@ -39,7 +39,7 @@
 
             private var lastResultSymbol:Symbol;
             private var lastResultSwatch:UIComponent;
-			
+
 			[Bindable]
 			private var linkicon:String;
 
@@ -140,7 +140,7 @@
                      maxDisplayedLines="-1"
                      text="{searchResult.content}"/>
         </s:VGroup>
-        <mx:Image width="18" height="18"
+        <mx:Image width="20" height="20"
                   buttonMode="true"
                   click="showLink(event)"
                   includeInLayout="{searchResult.link != null}"

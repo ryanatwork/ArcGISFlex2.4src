@@ -10,9 +10,9 @@
     <toolbarvisible>false</toolbarvisible>
     <toolbarcutvisible>false</toolbarcutvisible>
     <toolbarmergevisible>false</toolbarmergevisible>
-    <toolbarreshapevisible>false</toolbarreshapevisible>   
+    <toolbarreshapevisible>false</toolbarreshapevisible>
     <updategeometry>true</updategeometry>
-    <updateattributes>true</updateattributes> 
+    <updateattributes>true</updateattributes>
 </configuration>
 
 <!--

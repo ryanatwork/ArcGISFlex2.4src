@@ -16,36 +16,38 @@ package widgets.eSearch
 	import com.esri.ags.geometry.Geometry;
 	import com.esri.ags.geometry.MapPoint;
 	import com.esri.ags.symbols.Symbol;
-	
+
 	import flash.events.EventDispatcher;
-	
+
 	[Bindable]
 	[RemoteClass(alias="widgets.eSearch.SearchResult")]
-	
+
 	public class SearchResult extends EventDispatcher
 	{
 	    public var title:String;
-	
+
 	    public var symbol:Symbol;
-		
+
 		public var icon:String;
-	
+
 	    public var content:String;
-	
+
 	    public var point:MapPoint;
-	
+
 	    public var link:String;
-	
+
+		public var linkalias:String;
+
 	    public var geometry:Geometry;
-		
+
 		public var graphic:Graphic;
-		
+
 		public var selected:Boolean;
-		
+
 		public var gid:Number;
-		
+
 		public var multi:String;
-		
+
 		public var linkicon:String;
 	}
 

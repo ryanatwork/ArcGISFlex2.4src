@@ -24,7 +24,7 @@
              preinitialize="skin_preinitializeHandler(event)">
 
     <fx:Metadata>
-        /** 
+        /**
          * A strongly typed property that references the component to which this skin is applied.
          */
         [HostComponent("com.esri.ags.webmap.PopUpRenderer")]
@@ -39,6 +39,7 @@
             paddingLeft: 0;
             paddingRight: 0;
             paddingTop: 5;
+			labelWidth: 150;
         }
     </fx:Style>
 
@@ -60,6 +61,7 @@
 
             import mx.containers.Form;
             import mx.containers.FormItem;
+			import mx.controls.Alert;
             import mx.controls.Label;
             import mx.core.ScrollPolicy;
             import mx.events.FlexEvent;
@@ -139,7 +141,9 @@
                             var descriptionText:Text = new PopUpText();
                             descriptionText.percentWidth = 100;
                             descriptionText.styleSheet = textStyleSheet;
+
                             cleanAndSetHtmlText(descriptionText, htmlText);
+							trace(descriptionText.htmlText);
                             vGroup.addElement(descriptionText);
                         }
                     }
@@ -152,11 +156,12 @@
                             {
                                 var formItem:FormItem = new FormItem();
                                 formItem.label = fieldInfo.label || fieldInfo.fieldName;
+
                                 var label:Label;
                                 htmlText = formattedAttributes[fieldInfo.fieldName];
                                 if (htmlText)
                                 {
-                                    // convert attribute field values that just contain URLs into links 
+                                    // convert attribute field values that just contain URLs into links
                                     var match:Array = htmlText.match(/^\s*((https?|ftp):\/\/\S+)\s*$/i);
                                     if (match && match.length > 0)
                                     {

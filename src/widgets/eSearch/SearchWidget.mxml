@@ -13,12 +13,11 @@
 	////////////////////////////////////////////////////////////////////////////////
 -->
 
-<!-- 
-	Version 2.4.0.1 - 08/5/2011
-	* Bug fix for null value in link field not being handled correctly
-    * added the Flex API PopUpInfoRendererSkin.mxml fix
-    * added the new useutc attribute to the field element
---> 
+<!--
+	Version 2.4.0.11 - 10/13/2011
+	* Fix Datagrid autosize function when using mapservices with joins
+      in both the floating and fixed datagrids
+-->
 <viewer:BaseWidget xmlns:esri			="http://www.esri.com/2008/ags"
 				   xmlns:fx				="http://ns.adobe.com/mxml/2009"
 				   xmlns:s				="library://ns.adobe.com/flex/spark"
@@ -34,13 +33,13 @@
 		<s:State name="spatialInput" />
 		<s:State name="resultsList"/>
 	</viewer:states>
-	
+
 	<viewer:transitions>
 		<s:Transition autoReverse="true" toState="*">
 			<s:Fade targets="{[graphicalInput, textInput, spatialInput, resultsList]}"/>
 		</s:Transition>
 	</viewer:transitions>
-	
+
 	<fx:Declarations>
 		<s:GlowFilter id="glowFilter"
 					  alpha="1"
@@ -52,17 +51,7 @@
 							  url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer"/>
 		<s:ColorMatrixFilter id="cOver" matrix="[0.5,0.5,0.5,0,0,0.5,0.5,0.5,0,0,0.5,0.5,0.5,0,0,0,0,0,0.6,0]"/>
 	</fx:Declarations>
-	
-	<fx:Style>
-		@namespace s "library://ns.adobe.com/flex/spark";
-		@namespace mx "library://ns.adobe.com/flex/mx";
-		@namespace esri "http://www.esri.com/2008/ags";
-		esri|PopUpRenderer
-		{
-			skinClass:ClassReference('widgets.eSearch.PopUpRendererSkin');
-		}
-	</fx:Style>
-	
+
 	<fx:Script>
 		<![CDATA[
 			import com.esri.ags.FeatureSet;
@@ -91,12 +80,14 @@
 			import com.esri.ags.layers.supportClasses.FeatureType;
 			import com.esri.ags.layers.supportClasses.Field;
 			import com.esri.ags.layers.supportClasses.LayerDetails;
+			import com.esri.ags.layers.supportClasses.RangeDomain;
 			import com.esri.ags.symbols.PictureMarkerSymbol;
 			import com.esri.ags.symbols.SimpleFillSymbol;
 			import com.esri.ags.symbols.SimpleLineSymbol;
 			import com.esri.ags.symbols.SimpleMarkerSymbol;
 			import com.esri.ags.symbols.Symbol;
 			import com.esri.ags.tasks.GeometryServiceSingleton;
+			import com.esri.ags.tasks.GeometryService;
 			import com.esri.ags.tasks.QueryTask;
 			import com.esri.ags.tasks.supportClasses.BufferParameters;
 			import com.esri.ags.tasks.supportClasses.Query;
@@ -110,7 +101,7 @@
 			import com.esri.viewer.ViewerContainer;
 			import com.esri.viewer.components.TitlebarButton;
 			import com.esri.viewer.components.toc.utils.MapUtil;
-			
+
 			import mx.collections.*;
 			import mx.controls.Alert;
 			import mx.controls.ToolTip;
@@ -121,6 +112,7 @@
 			import mx.events.ListEvent;
 			import mx.events.ScrollEvent;
 			import mx.events.ToolTipEvent;
+			import mx.events.ValidationResultEvent;
 			import mx.formatters.CurrencyFormatter;
 			import mx.formatters.DateFormatter;
 			import mx.formatters.NumberFormatter;
@@ -132,9 +124,10 @@
 			import mx.rpc.events.ResultEvent;
 			import mx.utils.ObjectUtil;
 			import mx.utils.StringUtil;
-			
+			import mx.validators.NumberValidator;
+
 			import spark.components.supportClasses.ItemRenderer;
-			
+
 			//labels
 			private var graphicalsearchLabel:String;
 			private var textsearchLabel:String;
@@ -149,8 +142,8 @@
 			[Bindable]
 			private var layerExprLabel:String;
 			private var nolayerLabel:String;
-			[Bindable]	
-			private var submitLabel:String;	
+			[Bindable]
+			private var submitLabel:String;
 			[Bindable]
 			private var pointLabel:String;
 			[Bindable]
@@ -169,8 +162,8 @@
 			private var zoomallLabel:String;
 			[Bindable]
 			private var zoomallTip:String;
-			private var loadingLabel:String;	
-			private var selectionLabel:String;		
+			private var loadingLabel:String;
+			private var selectionLabel:String;
 			[Bindable]
 			private var drawGraLabel:String;
 			[Bindable]
@@ -187,7 +180,7 @@
 			private var drawGraphicsLayer:GraphicsLayer;
 			[Bindable]
 			private var bufferGraphicsLayer:GraphicsLayer;
-			
+
 			//Properties
 			[Bindable]
 			private var eDrawEnabled:Boolean = false;
@@ -212,6 +205,7 @@
 			private var queryLinkPre:String = "";
 			private var queryLinkField:String = "";
 			private var queryLinkSuffix:String = "";
+			private var queryLinkAlias:String = "";
 			private var queryLinkIcon:String = "";
 			private var queryLinkIconPre:String = "";
 			private var queryLinkIconSuffix:String = "";
@@ -259,9 +253,13 @@
 			private var selectedGraphicalTool:String;
 			[Bindable]
 			private var multiPartGraphicSearch:Boolean;
-			
+
+			private var executingURLquery:Boolean;
+
 			private var floatorfixed:String;
-			
+
+			private var numberValidator:NumberValidator;
+
 			[Bindable]
 			private var searchResultAC:ArrayCollection;
 			//Formatters
@@ -270,17 +268,24 @@
 			private var dateFormatter:DateFormatter = new DateFormatter();
 			private var numFormatter:NumberFormatter = new NumberFormatter();
 			private var currFormatter:CurrencyFormatter = new CurrencyFormatter();
-			
+
 			//Symbols
 			private var drawSymbol:Symbol;
 			private var resultMarkerSymbol:Symbol;
 			private var resultLineSymbol:Symbol;
 			private var resultFillSymbol:Symbol;
 			private var overFillSymbol:Symbol;
-			
-			
+
+			protected const VERSION:String = "2.4.0.10";
+
+			protected const BUILDDATE:String = "09/13/2011";
+
+			[Embed(source="assets/images/i_about.png")]
+			private var iconClass:Class;
+
+
 			private function init():void
-			{					
+			{
 				sWidget = this;
 				WIDGET_URL = config.substring(0,config.lastIndexOf("/")) + "/assets/images/";
 				if (configXML)
@@ -313,24 +318,24 @@
 					zoomallTip = configXML.labels.zoomalltip || "Zoom to all results";
 					loadingLabel = configXML.labels.loadinglabel || "Loading...";
 					selectionLabel = configXML.labels.selectionlabel || "Features Selected:";
-					gridresultsLabel = configXML.labels.gridresultsLabel || "Show Results in Grid";
+					gridresultsLabel = configXML.labels.gridresultslabel || "Show Results in Grid";
 					exp2csvOptLbl = configXML.labels.export2csvbuttonlabel || "Export to CSV...";
 					exp2txtOptLbl = configXML.labels.export2txtbuttonlabel || "Export to Txt...";
 					expBtnLbl = configXML.labels.exportbtnlabel || "Export...";
 					_csvName = configXML.labels.csvdefaultname || "Selected Records";
-					csvSep = configXML.csvSeparator;
+					csvSep = configXML.csvseparator;
 					spatialsearchLabel = configXML.labels.spatialsearchlabel || "Spatial search";
 					searchLayerLabel = configXML.labels.searchlayerlabel || "Search entities of:";
 					bufferLabel = configXML.labels.bufferlabel || "apply a search distance:";
 					applyBufferLabel = configXML.labels.applybufferlabel || "Apply buffer";
-					sReff = new SpatialReference(configXML.spatialReference);
+					sReff = new SpatialReference(configXML.spatialreference);
 					pltol = configXML.toleranceforpointgraphicalselection || 3;
 					defaultSelectionOption = configXML.defaultselectionoption || "textInput";
 					currentState = defaultSelectionOption;
 					disableButtons = configXML.disablebuttons || "";
 					selectedGraphicalTool = configXML.selectedgraphicaltool || "";
-					enableMultiPartSearch = configXML.enablemultipartsearch || "enable multi-part graphics";
-					
+					enableMultiPartSearch = configXML.labels.enablemultipartsearch || "enable multi-part graphics";
+
 					configSpatialSearchRelation = [];
 					var operList:XMLList = configXML..spatialrelationship;
 					var sOpBtn:Image;
@@ -361,32 +366,32 @@
 						cboSearchLayerSpatial.includeInLayout = false;
 						SpatialOps.includeInLayout = false;
 					}
-					
+
 					eDrawEnabled = configXML.enabledrawgraphicbutton && configXML.enabledrawgraphicbutton == "true";
 					pBufferEnabled = configXML.enablebuffergraphicbutton && configXML.enablebuffergraphicbutton == "true";
 					multiPartGraphicSearch = configXML.multipartgraphicsearch && configXML.multipartgraphicsearch == "true";
 					(multiPartGraphicSearch.valueOf() == true) ? graFeatureQueryBtn.visible = true : graFeatureQueryBtn.visible = false;
 					floatorfixed = configXML.floatorfixed || "float";
-					
+
 					if(eDrawEnabled){
 						eDrawBtn.filters = [cOver];
 						eDrawBtn.buttonMode = eDrawBtn.useHandCursor = eDrawBtn.enabled = false;
-						map.addEventListener(MapEvent.LAYER_ADD, checkForGL);					
+						map.addEventListener(MapEvent.LAYER_ADD, checkForeDrawGL);
 						MapUtil.forEachMapLayer(map, function(layer:Layer):void
 						{
 							if(layer.name.toLowerCase() == "draw features"){
 								drawGraphicsLayer = layer as GraphicsLayer;
-								drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkDrawNumGras);
-								drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkDrawNumGras);
-								drawGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkDrawNumGras);
+								drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkeDrawNumGras);
+								drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkeDrawNumGras);
+								drawGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkeDrawNumGras);
 							}
 						});
 					}
-					
+
 					if(pBufferEnabled){
 						pBufferBtn.filters = [cOver];
 						pBufferBtn.buttonMode = pBufferBtn.useHandCursor = pBufferBtn.enabled = false;
-						map.addEventListener(MapEvent.LAYER_ADD, checkForGL2);					
+						map.addEventListener(MapEvent.LAYER_ADD, checkForpntBufferGL);
 						MapUtil.forEachMapLayer(map, function(layer:Layer):void
 						{
 							if(layer.name.toLowerCase() == "buffer results"){
@@ -397,7 +402,7 @@
 							}
 						});
 					}
-					
+
 					configBufferUnits = [];
 					var bufferUnitsList:XMLList = configXML..bufferunit;
 					for (var b:int = 0; b < bufferUnitsList.length(); b++)
@@ -411,12 +416,12 @@
 						};
 						configBufferUnits.push(bufferUnit);
 					}
-										
+
 					configSearchGraphical = [];
 					configSearchText = [];
 					configSpatialSearchLayers = [];
 					configDomainVals = [];
-					
+
 					var lyrList:XMLList = configXML..layer;
 					for (var i:Number = 0; i < lyrList.length(); i++)
 					{
@@ -425,7 +430,7 @@
 						var lyrLabel:String = lyrList[i].name;
 						var lyrGraphicalLabel:String = lyrList[i].graphicalsearchlabel;
 						var lyrExprList:XMLList = configXML.layers.layer[i]..expression;
-						
+
 						for (var j:Number = 0; j < lyrExprList.length(); j++)
 						{
 							var lyrExprAlias:String = lyrExprList[j].@alias;
@@ -434,14 +439,14 @@
 							var lyrField:String = lyrExprList[j].@field;
 							var lyrUserList:String = lyrExprList[j].@userlist;
 							var lyrDomain:Boolean = lyrExprList[j].@usedomain && lyrExprList[j].@usedomain == "true";
-							var expr:Object = 
+							var expr:Object =
 							{
 								label: lyrExprAlias,
 								textlabel: lyrTextLabel,
 								expression: lyrExpr,
 								field: lyrField,
 								usedomain: lyrDomain,
-								userlist: lyrUserList 
+								userlist: lyrUserList
 							}
 							configLayerExprs.push(expr);
 						}
@@ -451,12 +456,13 @@
 						var lyrLinkField:String = lyrList[i].linkfield;
 						var lyrLinkPre:String = lyrList[i].linkfield.@linkprefix;
 						var lyrLinkSuffix:String = lyrList[i].linkfield.@linksuffix;
+						var lyrLinkAlias:String = lyrList[i].linkfield.@linkaliastext;
 						var lyrLinkIcon:String = lyrList[i].icon;
 						var lyrLinkIconIsField:Boolean = lyrList[i].icon.@isfield && lyrList[i].icon.@isfield == "true";
 						var lyrLinkIconPre:String = lyrList[i].icon.@iconprefix;
 						var lyrLinkIconSuffix:String = lyrList[i].icon.@iconsuffix;
 						var lyrEnableExport:Boolean = lyrList[i].enableexport && lyrList[i].enableexport == "true";
-						
+
 						var lyrMultiImgField:String = lyrList[i].multiimagefield;
 						var useProxy:Boolean = lyrList[i].useproxy && lyrList[i].useproxy == "true";
 						var useAMF:String = lyrList[i].useamf;
@@ -468,10 +474,10 @@
 							if (Number(lyrList[i].zoomscale) > 0)
 								zoomScale = Number(lyrList[i].zoomscale);
 						}
-						
+
 						var lyrSpatialLabel:String = lyrList[i].spatialquerylabel;
 						var lyrSpatialSearchLyr:String = lyrList[i].spatialsearchlayer;
-						
+
 						var layer:FeatureLayer = new FeatureLayer(lyrURL);
 						if (useProxy && configData.proxyUrl)
 						{
@@ -497,8 +503,8 @@
 								}
 							}
 						}
-						
-						var searchLayer:Object = 
+
+						var searchLayer:Object =
 						{
 							layer: layer,
 							label: lyrLabel,
@@ -511,6 +517,7 @@
 							linkpre: lyrLinkPre,
 							linkfield: lyrLinkField,
 							linksuffix: lyrLinkSuffix,
+							linkalias: lyrLinkAlias,
 							linkiconpre: lyrLinkIconPre,
 							linkicon: lyrLinkIcon,
 							linkiconisfield: lyrLinkIconIsField,
@@ -522,11 +529,11 @@
 							opendg: openDG
 						}
 						configSearchGraphical.push(searchLayer);
-						
+
 						if (searchLayer.spatialsearchlayer == "true"){
 							configSpatialSearchLayers.push(searchLayer);
 						}
-						
+
 						if (lyrExpr){
 							configSearchText.push(searchLayer);
 							if(i==0){
@@ -538,7 +545,7 @@
 							}
 						}
 					}
-					
+
 					//marker symbol
 					if(configXML.symbols.picturemarkersymbol.@url[0] != null){
 						const resultMarkerSymbolURL:String = configXML.symbols.picturemarkersymbol.@url || widgetIcon;
@@ -561,35 +568,35 @@
 						const resultMarkerSymbolOutlineWidth:Number = (configXML.symbols.simplemarkersymbol.outline.@width[0] != null) ? configXML.symbols.simplemarkersymbol.outline.@width : 2;
 						resultMarkerSymbol = new SimpleMarkerSymbol(resultMarkerSymbolStyle,resultMarkerSymbolSize,resultMarkerSymbolColor,resultMarkerSymbolAlpha,resultMarkerSymbolXOffset2,resultMarkerSymbolYOffset2,resultMarkerSymbolAngle,new SimpleLineSymbol(resultMarkerSymbolOutlineStyle, resultMarkerSymbolOutlineColor, resultMarkerSymbolOutlineAlpha, resultMarkerSymbolOutlineWidth));
 					}
-					
+
 					//line symbol
 					const resultLineSymbolColor:uint = (configXML.symbols.simplelinesymbol.@color[0] != null) ? configXML.symbols.simplelinesymbol.@color : 0xFF0000;
 					const resultLineSymbolAlpha:Number = (configXML.symbols.simplelinesymbol.@alpha[0] != null) ? configXML.symbols.simplelinesymbol.@alpha : 0.8;
 					const resultLineSymbolWidth:Number = (configXML.symbols.simplelinesymbol.@width[0] != null) ? configXML.symbols.simplelinesymbol.@width : 2;
 					resultLineSymbol = new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, resultLineSymbolColor, resultLineSymbolAlpha, resultLineSymbolWidth);
-					
+
 					// fill symbol
 					const resultFillSymbolColor:uint = (configXML.symbols.simplefillsymbol.@color[0] != null) ? configXML.symbols.simplefillsymbol.@color : 0xFF0000;
-					const resultFillSymbolAlpha:Number = (configXML.symbols.simplefillsymbol.@alpha[0] != null) ? configXML.symbols.simplefillsymbol.@alpha : 0.5; 
+					const resultFillSymbolAlpha:Number = (configXML.symbols.simplefillsymbol.@alpha[0] != null) ? configXML.symbols.simplefillsymbol.@alpha : 0.5;
 					const resultFillSymbolOutlineColor:uint = (configXML.symbols.simplefillsymbol.outline.@color[0] != null) ? configXML.symbols.simplefillsymbol.outline.@color : 0xFF0000;
 					const resultFillSymbolOutlineAlpha:Number = (configXML.symbols.simplefillsymbol.outline.@alpha[0] != null) ? configXML.symbols.simplefillsymbol.outline.@alpha : 0.8;
 					const resultFillSymbolOutlineWidth:Number = (configXML.symbols.simplefillsymbol.outline.@width[0] != null) ? configXML.symbols.simplefillsymbol.outline.@width : 2;
 					resultFillSymbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID, resultFillSymbolColor, resultFillSymbolAlpha, new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, resultFillSymbolOutlineColor, resultFillSymbolOutlineAlpha, resultFillSymbolOutlineWidth));
-					
+
 					graphicsLayerBuffer = new GraphicsLayer();
-					graphicsLayerBuffer.name = "Buffer Results";
+					graphicsLayerBuffer.name = "Search Buffer Results";
 					map.addLayer(graphicsLayerBuffer);
-					
+
 					graphicsLayer = new GraphicsLayer();
 					graphicsLayer.name = "Search Results";
 					graphicsLayer.symbol = resultMarkerSymbol;
 					graphicsLayer.addEventListener(FlexEvent.HIDE, graphicsLayer_hideHandler);
 					map.addLayer(graphicsLayer);
-					
+
 					graGraphicsLayer = new GraphicsLayer();
 					graGraphicsLayer.name = "Graphical Search Layer";
 					map.addLayer(graGraphicsLayer);
-					
+
 					var userTolerance:Number = configXML.tolerance;
 					if (userTolerance > 0)
 					{
@@ -598,10 +605,10 @@
 					if (selectedGraphicalTool != "" && defaultSelectionOption == "graphicalInput")
 						activateSearchTool(null, selectedGraphicalTool);
 				}
-				
+
 				if(disableButtons != "")
 					var dbArr:Array = disableButtons.split(",");
-				
+
 				var disText:Boolean = false;
 				var disGra:Boolean = false;
 				var disSpat:Boolean = false;
@@ -644,7 +651,7 @@
 					wTemplate.addTitlebarButton(WIDGET_URL + "i_searchspatial.png", spatialsearchLabel, showStateSpatialSearch);
 				if(!disGrid)
 					wTemplate.addTitlebarButton(ICON_URL + "i_table.png", resultsLabel, showStateResults);
-				
+
 				//Setup Text Search
 				if (configSearchText.length)
 				{
@@ -667,7 +674,7 @@
 					boxText.visible = false;
 					txtLabelText.text = nolayerLabel;
 				}
-				
+
 				//Setup Graphical Search
 				if (configSearchGraphical.length)
 				{
@@ -684,13 +691,13 @@
 					boxGraphical.visible = false;
 					txtLabelGraphical.text = nolayerLabel;
 				}
-				
+
 				if (configSpatialSearchLayers.length)
 				{
 					cboSearchLayerSpatial.dataProvider = configSpatialSearchLayers;
 					cboBufferUnit.dataProvider = configBufferUnits;
 				}
-				
+
 				//Determine which button to select based on the default selection option
 				for(var tb:int=0; tb < wTemplate.headerToolGroup.numElements; tb++)
 				{
@@ -702,52 +709,40 @@
 					if(tbb.toolTip == spatialsearchLabel && defaultSelectionOption == "spatialInput")
 						wTemplate.selectedTitlebarButtonIndex = tb;
 				}
-				
+
 				AppEvent.addListener(AppEvent.DATA_PUBLISH, sharedDataUpdated);
 				//If you want the floating datagrid to constantly appear in the bottom left corner uncomment the next line and there are 2 more comments like this
 				//map.addEventListener(ExtentEvent.EXTENT_CHANGE, mapResizeHandler);
-				
+
 				if(ViewerContainer.urlConfigParams.search != null){
 					callLater(queryFromURL,[ViewerContainer.urlConfigParams.search,ViewerContainer.urlConfigParams.slayer,ViewerContainer.urlConfigParams.exprnum]);
 				}
 				wTemplate.visible = true;
-			}
-			
-			private function checkForGL2(evt:Event):void
-			{
-				MapUtil.forEachMapLayer(map, function(layer:Layer):void
-				{
-					if(layer.name.toLowerCase() == "buffer results"){
-						drawGraphicsLayer = layer as GraphicsLayer;
-						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkDrawNumGras);
-						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkDrawNumGras);
-						drawGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkDrawNumGras);
-					}
-				});
-			}
-			
-			private function checkBufferNumGras(event:Event):void
-			{
-				clearMessage();
-				if(bufferGraphicsLayer){
-					pBufferBtn.filters = (bufferGraphicsLayer.numGraphics > 0)?[]:[cOver];
-					pBufferBtn.buttonMode = pBufferBtn.useHandCursor = pBufferBtn.enabled = (bufferGraphicsLayer.numGraphics > 0);
-				}
+				wTemplate.header.addEventListener(MouseEvent.CLICK, DisplayVersion);
+				txtSearch.addEventListener(FlexEvent.ENTER, equeryFeaturesText);
+				searchBtn.addEventListener(MouseEvent.CLICK, equeryFeaturesText);
 			}
 
-//Added for URL Query			
+			private function equeryFeaturesText(evt:Event):void
+			{
+				queryFeaturesText();
+			}
+
+//Added for URL Query
 			public function queryFromURL(value:String, slayerId:int = 0, exprNum:int = 0):void
 			{
 				//hide infowindow if any
 				hideInfoWindow();
-				
+
+				executingURLquery = true;
+
 				var qFields:Array;
 				zoomScale = configSearchText[slayerId].zoomscale;
 				queryLayer = configSearchText[slayerId].layer;
 				queryExpr = configSearchText[slayerId].expr[exprNum].expression;
 				queryFields = configSearchText[slayerId].fields;
 				queryDefExpr = configSearchText[slayerId].defexpr;
-				
+
 				if (queryLayer && !queryLayer.loaded)
 				{
 					queryLayer.addEventListener(LayerEvent.LOAD, queryLayer_loadHandler);
@@ -757,7 +752,7 @@
 					}
 					return;
 				}
-				
+
 				var gfields:XMLList;
 				sumField = "";
 				gridFields = [];
@@ -805,9 +800,18 @@
 								}
 								if(fieldXML.@numberformat[0]){
 									if(fieldXML.@numberformat[0] == ""){
-										str += "NA";
+										str += "NA~";
 									}else{
-										str += fieldXML.@numberformat[0];
+										str += fieldXML.@numberformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@useutc[0]){
+									if(fieldXML.@useutc[0] == "false"){
+										str += "false";
+									}else{
+										str += "true";
 									}
 								}else{
 									str += "NA";
@@ -860,9 +864,10 @@
 						}
 					}
 				}
-				
+
 				queryTitleField = configSearchText[slayerId].titlefield;
 				queryLinkPre = configSearchText[slayerId].linkpre;
+				queryLinkAlias = configSearchText[slayerId].linkalias;
 				queryLinkField = configSearchText[slayerId].linkfield;
 				queryLinkSuffix = configSearchText[slayerId].linksuffix;
 				queryLinkIconPre = configSearchText[slayerId].linkiconpre;
@@ -872,29 +877,29 @@
 				queryMultiImgField = configSearchText[slayerId].multi;
 				queryEnableExport = configSearchText[slayerId].enableexport;
 				var fields:XMLList;
-				
+
 				if (queryLayer)
 				{
 					var query:Query = new Query();
 					var myPattern:RegExp = /\[value\]/g;
 					var expr:String;
-					expr = queryExpr.replace(myPattern, value); 
+					expr = queryExpr.replace(myPattern, value);
 					query.where = expr;
 					query.outSpatialReference = map.spatialReference;
 					if(queryDefExpr != "")
 						queryLayer.definitionExpression = queryDefExpr;
-					queryLayer.queryFeatures(query, new AsyncResponder(onResult, onFault, queryFields)); 
-					showMessage(loadingLabel, true); 
-					showStateResults();   
-					var gid:Number = 0;   
-					
+					queryLayer.queryFeatures(query, new AsyncResponder(onResult, onFault, queryFields));
+					showMessage(loadingLabel, true);
+					showStateResults();
+					var gid:Number = 0;
+
 					// on result
-					function onResult(featureSet:FeatureSet, token:XMLList = null):void                 
-					{   
+					function onResult(featureSet:FeatureSet, token:XMLList = null):void
+					{
 						try
 						{
-							for each (var gra:Graphic in featureSet.features)                    
-							{   
+							for each (var gra:Graphic in featureSet.features)
+							{
 								var obj:Object = gra.attributes;
 								obj["gid"] = gid;
 								gid +=1;
@@ -902,26 +907,51 @@
 							gridDataProvider = featureSet.attributes;
 							resultsFeatureSet = featureSet;
 							searchResultAC = createSearchResults(featureSet, token);
+
 							// share data
 							addSharedData(widgetTitle, searchResultAC);
 							showMessage(selectionLabel + " " + featureSet.features.length, false);
+							msgVisible = true;
 							map.cursorManager.removeBusyCursor();
-							if(featureSet.features.length > 1){
-								var geom:Geometry = unionGeoms(featureSet);
-								map.extent = geom.extent.expand(1.2);
-								if (!map.extent.contains(geom.extent.expand(1.2)))
-								{
-									map.level--;
-								}
+
+							if(isNaN(zoomScale)){
+								zoomAll();
 							}else{
-								var pt:MapPoint = searchResultAC[0].point;
 								if (map.scale > zoomScale)
 									map.scale = zoomScale;
-								map.centerAt(pt);
+								map.centerAt(searchResultAC[0].point);
 							}
+
 							if(ViewerContainer.urlConfigParams.showdatagrid != null)
-								if(ViewerContainer.urlConfigParams.showdatagrid == "true")
+								if(ViewerContainer.urlConfigParams.showdatagrid == "true" && floatorfixed == "float")
 									showGridResults();
+
+							if(floatorfixed == "fixed")
+							{
+								var dgCongig:Object = {
+									widgetTitle: widgetTitle,
+									csvExportOptionLbl: exp2csvOptLbl,
+									txtExportOptionLbl: exp2txtOptLbl,
+									ExportButtonLbl: expBtnLbl,
+									csvSeperator: csvSep,
+									dgFieldAliases: fldAliases,
+									csvName: _csvName,
+									sumField: sumField,
+									labelSum: lblSum,
+									dgColumns: gridFields,
+									dgHyperColumns: gridHyperFields,
+									dProvider: gridDataProvider,
+									graphicslayer: graphicsLayer,
+									zoomScale: zoomScale,
+									ownerWidget: sWidget,
+									layerDetails: queryLayer.layerDetails,
+									enableExport: queryEnableExport
+								}
+								var dgconfigArr:ArrayCollection = new ArrayCollection();
+								dgconfigArr.addItem(dgCongig);
+								addSharedData("configFixedDatagrid", dgconfigArr);
+							}
+							executingURLquery = false;
 						}
 						catch (error:Error)
 						{
@@ -930,17 +960,17 @@
 					}
 					//on fault
 					function onFault(info:Object, token:Object = null) : void
-					{      
+					{
 						showMessage(info.toString(), false);
 					}
-				}  
+				}
 			}
-//End Add	
+//End Add
 			private function sOpBtnClickHandler(event:Event):void
 			{
 				intersectResults(event.currentTarget.name);
 			}
-			
+
 			private function getSopImg(value:String):String
 			{
 				var retVal:String = ""
@@ -988,14 +1018,23 @@
 					}
 				}
 				return retVal;
-			}			
-			
+			}
+
 			private function searchLayerChangedText():void
 			{
 				cbSearch.visible = false;
 				cbSearch.includeInLayout = false;
 				txtSearch.visible = true;
 				txtSearch.includeInLayout = true;
+				txtSearch.restrict = null;
+				txtSearch.errorString = "";
+				if(numberValidator){
+					numberValidator.property = "";
+					numberValidator.source = null;
+				}
+
+				txtSearch.addEventListener(FlexEvent.ENTER, equeryFeaturesText);
+				searchBtn.addEventListener(MouseEvent.CLICK, equeryFeaturesText);
 				var i:Number = cboLayerText.selectedIndex;
 				if(configSearchText[i].expr[0].usedomain)
 					popCBwithDomain(configSearchText[i].expr[0].field);
@@ -1012,7 +1051,7 @@
 					boxTextexpr.includeInLayout = true;
 				}
 			}
-			
+
 			private function searchLayerExprChangedText():void
 			{
 				var i:Number = cboLayerText.selectedIndex;
@@ -1021,23 +1060,29 @@
 				cbSearch.includeInLayout = false;
 				txtSearch.visible = true;
 				txtSearch.includeInLayout = true;
+				if(numberValidator){
+					numberValidator.property = "";
+					numberValidator.source = null;
+				}
+				searchBtn.addEventListener(MouseEvent.CLICK, equeryFeaturesText);
+				txtSearch.addEventListener(FlexEvent.ENTER, equeryFeaturesText);
 				if(configSearchText[i].expr[j].usedomain)
 					popCBwithDomain(configSearchText[i].expr[j].field);
 				else if(configSearchText[i].expr[j].userlist != "")
 					popCBwithUserList(configSearchText[i].expr[j].userlist);
 				txtLabelText.text = configSearchText[i].expr[j].textlabel;
 			}
-			
+
 			private function searchLayerChangedGraphical():void
 			{
 				var i:Number = cboLayerGraphical.selectedIndex;
 				txtLabelGraphical.text = configSearchText[i].graphicallabel;
 			}
-			
+
 			private function activateSearchTool(event:MouseEvent, lTool:String = ""):void
 			{
 				addSharedData("Deactivate_DrawTool", null); // to be able to deactivate drawTool on other widgets
-				
+
 				if(event){
 					graGraphicsLayer.clear();
 					selectedDrawingIcon = Image(event.currentTarget);
@@ -1071,7 +1116,7 @@
 				}
 				clearSelectionFilter();
 				selectedDrawingIcon.filters = [ glowFilter ];
-				
+
 				var status:String;
 				var value:String = lastTool = selectedDrawingIcon.name;
 				switch (value)
@@ -1102,8 +1147,8 @@
 					}
 				}
 				setMapAction(value, status, drawSymbol, searchDrawEnd);
-			}			
-			
+			}
+
 			private function searchDrawEnd(event:DrawEvent):void
 			{
 				activateSearchTool(null,lastTool);
@@ -1114,12 +1159,12 @@
 					queryFeaturesGra();
 				}
 			}
-			
+
 			private function graMultiChanged():void
 			{
 				(graMultiChk.selected) ? graFeatureQueryBtn.visible = true : graFeatureQueryBtn.visible = false;
 			}
-			
+
 			private function unionGeoms2(gl:GraphicsLayer):Geometry
 			{
 				var retGeom:Geometry;
@@ -1148,7 +1193,7 @@
 						rType = "poly";
 						mPoly.spatialReference = ext2.spatialReference;
 					}
-					
+
 					if(graphic.geometry.type == "esriGeometryMultipoint")
 					{
 						var mp:Multipoint = graphic.geometry as Multipoint
@@ -1159,7 +1204,7 @@
 						}
 						rType = "point";
 					}
-					
+
 					if(graphic.geometry.type == "esriGeometryPolygon")
 					{
 						var poly:Polygon = graphic.geometry as Polygon;
@@ -1177,7 +1222,7 @@
 						rType = "poly";
 						mPoly.spatialReference = poly.spatialReference;
 					}
-					
+
 					if(graphic.geometry.type == "esriGeometryPolyline")
 					{
 						var polyl:Polyline = graphic.geometry as Polyline;
@@ -1194,7 +1239,7 @@
 						}
 						rType = "line";
 					}
-					
+
 					if(graphic.geometry.type == "esriGeometryEnvelope")
 					{
 						var ext:Extent = graphic.geometry as Extent;
@@ -1208,7 +1253,7 @@
 						rType = "poly";
 					}
 				}
-				
+
 				switch(rType){
 					case "point":
 					{
@@ -1228,7 +1273,7 @@
 				}
 				return retGeom;
 			}
-			
+
 			private function queryFeaturesGra():void
 			{
 				var geom:Geometry
@@ -1239,7 +1284,7 @@
 					geom = (graLayAC[0] as Graphic).geometry;
 				else
 					return;
-				
+
 				selectedDrawingIcon = null;
 				clearSelectionFilter();
 				clearBuffer();
@@ -1260,29 +1305,29 @@
 				}
 				graGraphicsLayer.clear();
 			}
-			
+
 			private function createExtentAroundMapPoint(centerPoint:MapPoint, tolerance:Number):Extent
 			{
 				var screenPoint:Point = map.toScreen(centerPoint as MapPoint);
-				
+
 				var upperLeftScreenPoint:Point = new Point(screenPoint.x - tolerance, screenPoint.y - tolerance);
 				var lowerRightScreenPoint:Point = new Point(screenPoint.x + tolerance, screenPoint.y + tolerance);
-				
+
 				var upperLeftMapPoint:MapPoint = map.toMap(upperLeftScreenPoint);
 				var lowerRightMapPoint:MapPoint = map.toMap(lowerRightScreenPoint);
-				
+
 				return new Extent(upperLeftMapPoint.x, upperLeftMapPoint.y, lowerRightMapPoint.x, lowerRightMapPoint.y, map.spatialReference);
 			}
-			
+
 			//query features text
 			private function queryFeaturesText():void
 			{
 				//hide infowindow if any
 				hideInfoWindow();
-				
+
 				var i:int = cboLayerText.selectedIndex;
 				queryLayer = configSearchText[i].layer;
-				
+
 				if (queryLayer && !queryLayer.loaded)
 				{
 					queryLayer.addEventListener(LayerEvent.LOAD, queryLayer_loadHandler);
@@ -1292,7 +1337,7 @@
 					}
 					return;
 				}
-				
+
 				var qFields:Array;
 				zoomScale = configSearchText[i].zoomscale;
 				queryLayer = configSearchText[i].layer;
@@ -1347,9 +1392,18 @@
 								}
 								if(fieldXML.@numberformat[0]){
 									if(fieldXML.@numberformat[0] == ""){
-										str += "NA";
+										str += "NA~";
 									}else{
-										str += fieldXML.@numberformat[0];
+										str += fieldXML.@numberformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@useutc[0]){
+									if(fieldXML.@useutc[0] == "false"){
+										str += "false";
+									}else{
+										str += "true";
 									}
 								}else{
 									str += "NA";
@@ -1402,9 +1456,10 @@
 						}
 					}
 				}
-				
+
 				queryTitleField = configSearchText[i].titlefield;
 				queryLinkPre = configSearchText[i].linkpre;
+				queryLinkAlias = configSearchText[i].linkalias;
 				queryLinkField = configSearchText[i].linkfield;
 				queryLinkSuffix = configSearchText[i].linksuffix;
 				queryLinkIconPre = configSearchText[i].linkiconpre;
@@ -1422,25 +1477,25 @@
 					var myPattern:RegExp = /\[value\]/g;
 					var expr:String;
 					if (txtSearch.visible){
-						expr = queryExpr.replace(myPattern, txtSearch.text); 
+						expr = queryExpr.replace(myPattern, txtSearch.text);
 					}else{
-						expr = queryExpr.replace(myPattern, cbSearch.selectedItem.value); 
+						expr = queryExpr.replace(myPattern, cbSearch.selectedItem.value);
 					}
 					query.where = expr;
 					query.outSpatialReference = map.spatialReference;
 					if(queryDefExpr != "")
-						queryLayer.definitionExpression = queryDefExpr; 
+						queryLayer.definitionExpression = queryDefExpr;
 					queryLayer.queryFeatures(query, new AsyncResponder(onResult, onFault, queryFields));
-					showMessage(loadingLabel, true); 
-					showStateResults();   
+					showMessage(loadingLabel, true);
+					showStateResults();
 					var gid:Number = 0;
 					// on result
-					function onResult(featureSet:FeatureSet, token:XMLList = null):void                
-					{   
+					function onResult(featureSet:FeatureSet, token:XMLList = null):void
+					{
 						try
-						{ 
-							for each (var gra:Graphic in featureSet.features)                    
-							{   
+						{
+							for each (var gra:Graphic in featureSet.features)
+							{
 								var obj:Object = gra.attributes;
 								obj["gid"] = gid;
 								gid +=1;
@@ -1498,30 +1553,30 @@
 								dgconfigArr.addItem(dgCongig);
 								addSharedData("configFixedDatagrid", dgconfigArr);
 							}
-							
+
 							if (openDataGrid && floatorfixed != "fixed")
-								showGridResults(); 
+								showGridResults();
 						}
 						catch (error:Error)
 						{
 							showMessage(error.message, false);
 						}
 					}
-					
+
 					//on fault
 					function onFault(info:Object, token:Object = null) : void
-					{                    
-						showMessage(info.toString(), false);         
+					{
+						showMessage(info.toString(), false);
 					}
-				}  
-			}				
-			
+				}
+			}
+
 			//query features graphical
 			private function queryFeaturesGraphical(geom:Geometry, querySpatialRel:String, layerConfig:Object):void
 			{
 				//hide infowindow if any
 				hideInfoWindow();
-				
+
 				var qFields:Array;
 				queryLayer = layerConfig.layer;
 				queryGeom = geom;
@@ -1575,9 +1630,18 @@
 								}
 								if(fieldXML.@numberformat[0]){
 									if(fieldXML.@numberformat[0] == ""){
-										str += "NA";
+										str += "NA~";
 									}else{
-										str += fieldXML.@numberformat[0];
+										str += fieldXML.@numberformat[0] + "~";
+									}
+								}else{
+									str += "NA~";
+								}
+								if(fieldXML.@useutc[0]){
+									if(fieldXML.@useutc[0] == "false"){
+										str += "false";
+									}else{
+										str += "true";
 									}
 								}else{
 									str += "NA";
@@ -1634,6 +1698,7 @@
 				queryLinkPre = layerConfig.linkpre;
 				queryLinkField = layerConfig.linkfield;
 				queryLinkSuffix = layerConfig.linksuffix;
+				queryLinkAlias =  layerConfig.linkalias;
 				queryLinkIconPre = layerConfig.linkiconpre;
 				queryLinkIcon = layerConfig.linkicon;
 				queryLinkIconSuffix = layerConfig.linkiconsuffix;
@@ -1643,7 +1708,7 @@
 				queryEnableExport = layerConfig.enableexport;
 				queryDefExpr = layerConfig.defexpr;
 				openDataGrid = layerConfig.opendg;
-				
+
 				var fields:XMLList;
 				if (queryLayer)
 				{
@@ -1655,16 +1720,16 @@
 					if(queryDefExpr != "")
 						queryLayer.definitionExpression = queryDefExpr;
 					queryLayer.queryFeatures(query, new AsyncResponder(onResult, onFault, queryFields));
-					showMessage(loadingLabel, true); 
-					showStateResults();   
+					showMessage(loadingLabel, true);
+					showStateResults();
 					var gid:Number = 0;
 					// on result
 					function onResult(featureSet:FeatureSet, token:XMLList = null):void
-					{   
+					{
 						try
 						{
-							for each (var gra:Graphic in featureSet.features)                    
-							{   
+							for each (var gra:Graphic in featureSet.features)
+							{
 								var obj:Object = gra.attributes;
 								obj["gid"] = gid;
 								gid +=1;
@@ -1725,17 +1790,17 @@
 						catch (error:Error)
 						{
 							showMessage(error.message, false);
-						}	
+						}
 					}
-					
+
 					//on fault
 					function onFault(info:Object, token:Object = null) : void
-					{                    
-						showMessage(info.toString(), false);         
+					{
+						showMessage(info.toString(), false);
 					}
-				}  
+				}
 			}
-			
+
 			private function unionGeoms(featureSet:FeatureSet):Geometry
 			{
 				var graphic:Graphic;
@@ -1751,7 +1816,7 @@
 						mPoint.addPoint(graphic.geometry as MapPoint);
 						rType = "point";
 					}
-					
+
 					if(graphic.geometry.type == "esriGeometryMultipoint")
 					{
 						var mp:Multipoint = graphic.geometry as Multipoint
@@ -1762,7 +1827,7 @@
 						}
 						rType = "point";
 					}
-					
+
 					if(graphic.geometry.type == "esriGeometryPolygon")
 					{
 						var poly:Polygon = graphic.geometry as Polygon;
@@ -1780,7 +1845,7 @@
 						rType = "poly";
 						mPoly.spatialReference = poly.spatialReference;
 					}
-					
+
 					if(graphic.geometry.type == "esriGeometryPolyline")
 					{
 						var polyl:Polyline = graphic.geometry as Polyline;
@@ -1797,7 +1862,7 @@
 						}
 						rType = "line";
 					}
-					
+
 					if(graphic.geometry.type == "esriGeometryEnvelope")
 					{
 						var ext:Extent = graphic.geometry as Extent;
@@ -1825,7 +1890,7 @@
 				sls.style = SimpleLineSymbol.STYLE_SOLID;
 				sls.width = 1;
 				sls.alpha = 0.4;
-				
+
 				switch(rType){
 					case "point":
 					{
@@ -1857,11 +1922,11 @@
 				}
 				return retGeom;
 			}
-			
+
 			private function applyBuffer():void
 			{
 				var graLayAC:ArrayCollection = graphicsLayer.graphicProvider as ArrayCollection;
-				if (graLayAC.length > 0) 
+				if (graLayAC.length > 0)
 				{
 					geomArr = [];
 					for each (var graphic:Graphic in graphicsLayer.graphicProvider)
@@ -1875,7 +1940,7 @@
 					showMessage("There is no result to buffer, please make a graphical or text search first.",false);
 				}
 			}
-			
+
 			private function bufferGeometries(geomArr:Array, sr:SpatialReference, dist:Array, unit:Number):void
 			{
 				if (geomArr)
@@ -1889,7 +1954,7 @@
 					bufferParameters.unionResults = true;
 					geometryService.addEventListener(GeometryServiceEvent.BUFFER_COMPLETE, bufferCompleteHandler);
 					geometryService.buffer(bufferParameters);
-					
+
 					function bufferCompleteHandler(event:GeometryServiceEvent):void
 					{
 						geometryService.removeEventListener(GeometryServiceEvent.BUFFER_COMPLETE, bufferCompleteHandler);
@@ -1902,20 +1967,20 @@
 							sfs.alpha = hsBufferAlpha.value;//0.2;
 							graphic.geometry = resultEvent;
 							graphic.symbol = sfs;
-							
+
 							graphicsLayerBuffer.clear();
-							graphicsLayerBuffer.add(graphic);							
+							graphicsLayerBuffer.add(graphic);
 						}
 						catch (error:Error)
 						{
 							showMessage(error.message, false);
 						}
-					}					
-					
+					}
+
 				}
-				
+
 			}
-			
+
 			private function intersectResults(spatialRelat:String):void
 			{
 				geomArr = [];
@@ -1936,25 +2001,25 @@
 						}
 					}else{
 						queryFeaturesGraphical(intersectGeom, spatialRelat,configSpatialSearchLayers[cboSearchLayerSpatial.selectedIndex]);
-					}					
+					}
 				} else {
 					showStateResults();
 					showMessage("There is no result to intersect, please make a graphical or text search first.",false);
 				}
 			}
-			
+
 			//create Search Results
 			private function createSearchResults(featureSet:FeatureSet, queryFields:XMLList):ArrayCollection
 			{
 				graphicsLayer.clear();
 				layerDetails = queryLayer.layerDetails;
 				var fields:XMLList = queryFields ? queryFields.field : null;
-				
+
 				var result:ArrayCollection = new ArrayCollection();
 				if (!queryTitleField)
 					queryTitleField = featureSet.displayFieldName;
 				var gid:Number = 0;
-				
+
 				for each (var graphic:Graphic in featureSet.features)
 				{
 					//if(graphic.geometry) continue;
@@ -1964,9 +2029,9 @@
 					var link:String = "";
 					var multi:String = "";
 					var linkicon:String = "";
-					
+
 					fldAliases = featureSet.fieldAliases;
-					
+
 					if (queryFields && queryFields[0].@all[0] == "true")
 					{
 						if (layerDetails.fields)
@@ -1995,11 +2060,11 @@
 							}
 						}
 					}
-					
+
 					function displayFields(fieldName:String, fieldXML:XML, field:Field):void
 					{
 						value = graphic.attributes[fieldName] ? String(graphic.attributes[fieldName]) : "";
-						
+
 						if (value)
 						{
 							var isDateField:Boolean;
@@ -2030,7 +2095,7 @@
 									value = msToDate(dateMS, dateFormat, useUTC);
 								}
 							}
-							
+
 							if(numFormat)
 							{
 								var args:Array = numFormat.split("|");
@@ -2048,7 +2113,7 @@
 								}
 								value = numFormatter.format(value);
 							}
-							
+
 							if(curFormat)
 							{
 								var args2:Array = curFormat.split("|");
@@ -2090,7 +2155,7 @@
 								}
 							}
 						}
-						
+
 						if (fieldName.toUpperCase() == queryTitleField.toUpperCase())
 						{
 							title = value;
@@ -2108,6 +2173,7 @@
 								link = "";
 							}
 						}
+
 						if (fieldName.toUpperCase() == queryLinkIcon.toUpperCase())
 						{
 							//concatenate
@@ -2140,14 +2206,14 @@
 									content += featureSet.fieldAliases[fieldName];
 									content += ": " + value + "\n";
 								}
-							} 
+							}
 						}
 					}
 					if(!queryLinkIconIsField)
 						linkicon = queryLinkIconPre + queryLinkIcon + queryLinkIconSuffix;
-						
+
 					graphic.checkForMouseListeners = false;
-					
+
 					var searchResult:SearchResult = new SearchResult();
 					searchResult.title = title;
 					searchResult.content = content;
@@ -2156,11 +2222,12 @@
 					searchResult.linkicon = linkicon ? linkicon : null;
 					searchResult.geometry = graphic.geometry;
 					searchResult.multi = multi ? multi :null;
-					searchResult.gid=gid;
+					searchResult.gid = gid;
+					searchResult.linkalias = queryLinkAlias;
 					searchResult.graphic = graphic;
-					
+
 					gid += 1;
-					
+
 					switch (graphic.geometry.type)
 					{
 						case Geometry.MAPPOINT:
@@ -2181,23 +2248,23 @@
 					}
 					graphic.attributes = searchResult;
 					result.addItem(searchResult);
-					
+
 					if (searchResult.point && !isNaN(searchResult.point.x) && !isNaN(searchResult.point.y)) // make sure it is a valid point
 					{
 						graphicsLayer.add(graphic);
 					}
 					// infowWindowRenderer on each graphic
 					var infoWindowRenderer:ClassFactory = new ClassFactory(PopUpRenderer);
-					infoWindowRenderer.properties = { popUpInfo: configurePopUpInfo(link)};
+					infoWindowRenderer.properties = { popUpInfo: configurePopUpInfo(link, queryLinkAlias)};
 					graphic.infoWindowRenderer = infoWindowRenderer;
 				}
 				return result;
 			}
-			
+
 			private function getFieldXML(fieldName:String, fields:XMLList):XML
 			{
 				var result:XML;
-				
+
 				for each (var fieldXML:XML in fields)
 				{
 					if (fieldName == fieldXML.@name[0])
@@ -2206,14 +2273,14 @@
 						break;
 					}
 				}
-				
+
 				return result;
 			}
-			
+
 			private function getField(fieldName:String):Field
 			{
 				var result:Field;
-				
+
 				if (queryLayer)
 				{
 					for each (var field:Field in queryLayer.layerDetails.fields)
@@ -2225,14 +2292,14 @@
 						}
 					}
 				}
-				
+
 				return result;
 			}
-			
+
 			private function getFeatureType(typeID:String):FeatureType
 			{
 				var result:FeatureType;
-				
+
 				if (queryLayer)
 				{
 					for each (var featureType:FeatureType in queryLayer.layerDetails.types)
@@ -2244,10 +2311,10 @@
 						}
 					}
 				}
-				
+
 				return result;
 			}
-			
+
 			private function msToDate(ms:Number, dateFormat:String, useUTC:Boolean):String
 			{
 				var date:Date = new Date(ms);
@@ -2259,7 +2326,7 @@
 				{
 					date.minutes += date.timezoneOffset;
 				}
-				
+
 				if (dateFormat)
 				{
 					dateFormatter.formatString = dateFormat;
@@ -2278,23 +2345,23 @@
 					return date.toLocaleString();
 				}
 			}
-			
+
 			private var layerDomainsCache:Dictionary = new Dictionary(); // map from queryLayer to domainsCache
-			
+
 			private function getCodedValue(fieldName:String, fieldValue:String, typeID:String):CodedValue
 			{
 				var result:CodedValue;
-				
+
 				var domainsCache:Object = layerDomainsCache[queryLayer];
 				if (!domainsCache)
 				{
 					domainsCache = {}; // map from (fieldName + typeID) to CodedValueDomain
 					layerDomainsCache[queryLayer] = domainsCache;
 				}
-				
+
 				var domainsKey:String = fieldName + typeID;
 				var codedValueDomain:CodedValueDomain;
-				
+
 				if (domainsKey in domainsCache)
 				{
 					codedValueDomain = domainsCache[domainsKey];
@@ -2319,7 +2386,7 @@
 					}
 					domainsCache[domainsKey] = codedValueDomain;
 				}
-				
+
 				if (codedValueDomain)
 				{
 					for each (var codedValue:CodedValue in codedValueDomain.codedValues)
@@ -2331,50 +2398,49 @@
 						}
 					}
 				}
-				
+
 				return result;
 			}
-			
+
 			private function popCBwithUserList(userList:String):void
 			{
 				configUserVals = [];
-				
+
 				var uArray:Array = StringUtil.trimArrayElements(userList,",").split(",");
-				
+
 				for each (var val:String in uArray)
 				{
 					var uval:String = val;
 					var ulbl:String = val;
-					var uVal:Object = 
+					var uVal:Object =
 					{
 						value: uval,
 						label: ulbl
 					}
 					configUserVals.push(uVal);
 				}
-				
+
 				cbSearch.dataProvider = configUserVals;
 				cbSearch.visible = true;
 				cbSearch.includeInLayout = true;
 				txtSearch.visible = false;
 				txtSearch.includeInLayout = false;
 			}
-			
+
 			private function popCBwithDomain(fieldName:String):void
 			{
 				configDomainVals = [];
-				
+
 				var tfield:Field;
-				
+
 				var i:int = cboLayerText.selectedIndex;
 				if (i == -1){
 					queryLayer = configSearchText[0].layer;
 				}else{
 					queryLayer = configSearchText[i].layer;
 				}
-				
-				if (queryLayer && !queryLayer.loaded)
-				{
+
+				if (queryLayer && !queryLayer.loaded){
 					queryLayer.addEventListener(LayerEvent.LOAD, queryLayer_loadHandler);
 					function queryLayer_loadHandler(event:LayerEvent):void
 					{
@@ -2382,53 +2448,87 @@
 					}
 					return;
 				}
-				
+
 				var domainsCache:Object = layerDomainsCache[queryLayer];
-				if (!domainsCache)
-				{
+				if (!domainsCache){
 					domainsCache = {}; // map from (fieldName + typeID) to CodedValueDomain
 					layerDomainsCache[queryLayer] = domainsCache;
 				}
-				
+
 				var domainsKey:String = fieldName;
 				var codedValueDomain:CodedValueDomain;
-				
-				if (domainsKey in domainsCache)
-				{
-					codedValueDomain = domainsCache[domainsKey];
-				}
-				else
-				{
+				var rangeDomain:RangeDomain;
+
+				if (domainsKey in domainsCache){
+					if(domainsCache[domainsKey].hasOwnProperty("codedValues"))
+						codedValueDomain = domainsCache[domainsKey];
+					else if (domainsCache[domainsKey].hasOwnProperty("minValue"))
+						rangeDomain = domainsCache[domainsKey];
+				}else{
 					var field:Field = getField(fieldName);
-					if (field)
-					{
+					if (field && field.domain.hasOwnProperty("codedValues")){
 						codedValueDomain = field.domain as CodedValueDomain;
+						domainsCache[domainsKey] = codedValueDomain;
+					}else if (field && field.domain.hasOwnProperty("minValue")){
+						rangeDomain = field.domain as RangeDomain;
+						domainsCache[domainsKey] = rangeDomain;
 					}
-					domainsCache[domainsKey] = codedValueDomain;
 				}
-				
-				if(codedValueDomain)
-				{
+
+				if(codedValueDomain){
 					for each (var codedValue:CodedValue in codedValueDomain.codedValues)
 					{
 						var dVal:String = codedValue.code;
 						var dLbl:String = codedValue.name;
-						var domVal:Object = 
+						var domVal:Object =
 						{
 							value: dVal,
 							label: dLbl
 						}
 						configDomainVals.push(domVal);
 					}
-					
+					cbSearch.prompt = "";
 					cbSearch.dataProvider = configDomainVals;
 					cbSearch.visible = true;
+					cbSearch.editable = false;
 					cbSearch.includeInLayout = true;
+					txtSearch.restrict = null;
+					txtSearch.errorString = "";
+					if(numberValidator){
+						numberValidator.property = "";
+						numberValidator.source = null;
+					}
 					txtSearch.visible = false;
 					txtSearch.includeInLayout = false;
 				}
+				if(rangeDomain){
+
+					searchBtn.removeEventListener(MouseEvent.CLICK, equeryFeaturesText);
+
+					txtSearch.removeEventListener(FlexEvent.ENTER, equeryFeaturesText);
+					txtSearch.errorString = "";
+					txtSearch.restrict = "0-9\\.\\-";
+					numberValidator = new NumberValidator();
+					numberValidator.required = false;
+					numberValidator.domain = "int";
+					numberValidator.source = txtSearch;
+					numberValidator.property = "text";
+					numberValidator.minValue = rangeDomain.minValue;
+					numberValidator.maxValue = rangeDomain.maxValue;
+					numberValidator.trigger = txtSearch;
+					numberValidator.triggerEvent = "enter";
+					numberValidator.exceedsMaxError +=  " " + rangeDomain.minValue.toString() + " - " + rangeDomain.maxValue.toString();
+					numberValidator.lowerThanMinError += " " + rangeDomain.minValue.toString() + " - " + rangeDomain.maxValue.toString();
+					numberValidator.addEventListener(ValidationResultEvent.VALID, equeryFeaturesText);
+
+					searchBtn.addEventListener(MouseEvent.CLICK, inputValidate);
+					function inputValidate(evt:Event):void
+					{
+						numberValidator.validate();
+					}
+				}
 			}
-			
+
 			//get geom center
 			private function getGeomCenter(gra:Graphic):MapPoint
 			{
@@ -2440,7 +2540,7 @@
 						pt = gra.geometry as MapPoint;
 						break;
 					}
-						
+
 					case Geometry.POLYLINE:
 					{
 						var pl:Polyline = gra.geometry as Polyline;
@@ -2452,7 +2552,7 @@
 						pt = pl.getPoint(pathIndex, ptIndex);
 						break;
 					}
-						
+
 					case Geometry.POLYGON:
 					{
 						var poly:Polygon = gra.geometry as Polygon;
@@ -2461,8 +2561,8 @@
 					}
 				}
 				return pt;
-			}			
-					
+			}
+
 			private function getDrawGra():void
 			{
 				if(drawGraphicsLayer)
@@ -2477,14 +2577,14 @@
 						queryFeaturesGraphical(geom, "esriSpatialRelIntersects", configSearchGraphical[cboLayerGraphical.selectedIndex]);
 					}else if(drawGraphicsLayer.graphicProvider.length == 0){
 						showStateResults();
-						showMessage("There are no graphics availible",false);
+						showMessage("There are no graphics available",false);
 					}
 				} else {
 					showStateResults();
-					showMessage("There are no graphics availible",false);
+					showMessage("There are no graphics available",false);
 				}
 			}
-			
+
 			private function getBufferGra():void
 			{
 				if(bufferGraphicsLayer)
@@ -2506,36 +2606,62 @@
 					showMessage("There are no graphics availible",false);
 				}
 			}
-			
-			private function checkForGL(evt:Event):void
+
+			private function checkForeDrawGL(evt:Event):void
 			{
 				MapUtil.forEachMapLayer(map, function(layer:Layer):void
 				{
 					if(layer.name.toLowerCase() == "draw features"){
 						drawGraphicsLayer = layer as GraphicsLayer;
-						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkDrawNumGras);
-						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkDrawNumGras);
-						drawGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkDrawNumGras);
+						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkeDrawNumGras);
+						drawGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkeDrawNumGras);
+						drawGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkeDrawNumGras);
 					}
 				});
 			}
-			
-			private function checkDrawNumGras(event:Event):void
+
+			private function checkeDrawNumGras(event:Event):void
 			{
-				clearMessage();
+				if (!executingURLquery){
+					clearMessage();
+				}
 				if(drawGraphicsLayer){
 					eDrawBtn.filters = (drawGraphicsLayer.numGraphics > 0)?[]:[cOver];
 					eDrawBtn.buttonMode = eDrawBtn.useHandCursor = eDrawBtn.enabled = (drawGraphicsLayer.numGraphics > 0);
 				}
 			}
-			
+
+			private function checkForpntBufferGL(evt:Event):void
+			{
+				MapUtil.forEachMapLayer(map, function(layer:Layer):void
+				{
+					if(layer.name.toLowerCase() == "buffer results"){
+						bufferGraphicsLayer = layer as GraphicsLayer;
+						bufferGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD, checkBufferNumGras);
+						bufferGraphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE, checkBufferNumGras);
+						bufferGraphicsLayer.addEventListener(GraphicsLayerEvent.GRAPHICS_CLEAR, checkBufferNumGras);
+					}
+				});
+			}
+
+			private function checkBufferNumGras(event:Event):void
+			{
+				if (!executingURLquery){
+					clearMessage();
+				}
+				if(bufferGraphicsLayer){
+					pBufferBtn.filters = (bufferGraphicsLayer.numGraphics > 0)?[]:[cOver];
+					pBufferBtn.buttonMode = pBufferBtn.useHandCursor = pBufferBtn.enabled = (bufferGraphicsLayer.numGraphics > 0);
+				}
+			}
+
 			private function clear():void
 			{
 				addSharedData("Deactivate_DrawTool", null); // to be able to deactivate drawTool on other widgets
-				
+
 				//hide infowindow if any
 				hideInfoWindow();
-				
+
 				if(currentState == "resultsList"){
 					currentState = lState;
 					if(lState == "graphicalInput"){
@@ -2551,6 +2677,7 @@
 				graGraphicsLayer.clear();
 				clearMessage();
 				txtSearch.text = "";
+				txtSearch.errorString = "";
 				sumField = "";
 				searchResultAC = null;
 				if (myfloatdg)
@@ -2558,34 +2685,34 @@
 				if(floatorfixed == "fixed")
 					addSharedData("clearFixedDatagrid", null);
 			}
-			
+
 			private function clearBuffer():void
 			{
 				graphicsLayerBuffer.clear();
-			}		
-			
+			}
+
 			private var hitimer:uint;
-			private var Hits:Array = new Array();									
-			
+			private var Hits:Array = new Array();
+
 			private function showMessage(msg:String, swfVisible:Boolean):void
 			{
 				txtMessage.text = msg;
 				swfMessage.visible = swfVisible;
 				msgVisible = true;
-			}			
-			
+			}
+
 			private function clearMessage():void
 			{
 				msgVisible = false;
 			}
-			
+
 			private function clickSearchResult(event:Event):void
 			{
 				var recAC:ArrayCollection = searchResultDG.dataProvider as ArrayCollection;
 				var searchResult:SearchResult = ItemRenderer(event.target).data as SearchResult;
 				unhighlightDataGroupItems();
 				searchResult.selected = true;
-				
+
 				if(lState == "textInput"){
 					var i:Number = cboLayerText.selectedIndex;
 					zoomScale = configSearchText[i].zoomscale;
@@ -2593,40 +2720,27 @@
 					var i2:Number = cboLayerGraphical.selectedIndex;
 					zoomScale = configSearchGraphical[i2].zoomscale;
 				}
-				
-				if (searchResult.geometry)
-				{
-					if (searchResult.geometry.type == Geometry.MAPPOINT)
-					{
+
+				if (searchResult.geometry){
+					if (searchResult.geometry.type == Geometry.MAPPOINT){
 						if (map.scale > zoomScale)
-						{
 							map.scale = zoomScale;
-						}
-						
 						map.centerAt(searchResult.point);
-					}
-					else
-					{
+					}else{
 						if(isNaN(zoomScale)){
 							map.extent = searchResult.geometry.extent;
-							
 							if (!map.extent.contains(searchResult.geometry))
-							{
 								map.level--;
-							}
 						}else{
 							if (map.scale > zoomScale)
-							{
 								map.scale = zoomScale;
-							}
-							
 							map.centerAt(searchResult.point);
 						}
 					}
 				}
-				
+
 				Hits.length = 0;
-				
+
 				if(myfloatdg){
 					if(myfloatdg.datagrid.dataProvider){
 						for each(var attributes:Object in gridDataProvider)
@@ -2639,9 +2753,9 @@
 										Hits.push(myCursor.current);
 									myCursor.moveNext();
 								}
-								myfloatdg.datagrid.selectedIndex = myfloatdg.datagrid.dataProvider.getItemIndex(Hits[0])                        
+								myfloatdg.datagrid.selectedIndex = myfloatdg.datagrid.dataProvider.getItemIndex(Hits[0])
 							}
-						}                
+						}
 						myfloatdg.datagrid.scrollToIndex(myfloatdg.datagrid.selectedIndex);
 					}
 				}
@@ -2654,7 +2768,7 @@
 					addSharedData("scrollFixedDataGrid", dgconfigArr);
 				}
 			}
-			
+
 			private function mouseOverSearchResult(event:Event):void
 			{
 				clearTimeout(hitimer);
@@ -2667,9 +2781,9 @@
 				{
 					hideInfoWindow();
 				}
-				
+
 				Hits.length = 0;
-				
+
 				if(myfloatdg){
 					if(myfloatdg.datagrid && myfloatdg.datagrid.dataProvider){
 						for each(var attributes:Object in gridDataProvider)
@@ -2682,9 +2796,9 @@
 										Hits.push(myCursor.current);
 									myCursor.moveNext();
 								}
-								myfloatdg.datagrid.selectedIndex = myfloatdg.datagrid.dataProvider.getItemIndex(Hits[0])                        
+								myfloatdg.datagrid.selectedIndex = myfloatdg.datagrid.dataProvider.getItemIndex(Hits[0])
 							}
-						}                
+						}
 						myfloatdg.datagrid.scrollToIndex(myfloatdg.datagrid.selectedIndex);
 					}
 				}
@@ -2697,12 +2811,12 @@
 					addSharedData("scrollFixedDataGrid", dgconfigArr);
 				}
 			}
-			
+
 			private function mouseOutSearchResult(event:Event):void
 			{
 				clearTimeout(hitimer);
 			}
-			
+
 			private function widgetOpenedHandler(event:Event):void
 			{
 				if(graphicsLayer)
@@ -2712,7 +2826,7 @@
 				if (graGraphicsLayer)
 					graGraphicsLayer.visible = true;
 			}
-			
+
 			private function mapResizeHandler(evt:Event):void
 			{
 				if(myfloatdg){
@@ -2720,7 +2834,7 @@
 					myfloatdg.x = 0;
 				}
 			}
-			
+
 			private function showGridResults():void
 			{
 				try
@@ -2729,7 +2843,7 @@
 						showMessage("No Datagrid configured for this layer", false);
 						return;
 					}
-					
+
 					if(floatorfixed == "float"){
 						if(!myfloatdg){
 							myfloatdg = SearchWidgetFloatDG(PopUpManager.createPopUp(map,SearchWidgetFloatDG,false,PopUpManagerChildList.POPUP));
@@ -2747,7 +2861,7 @@
 								}
 							}
 							if(exists == false)
-								PopUpManager.addPopUp(myfloatdg,map,false); 
+								PopUpManager.addPopUp(myfloatdg,map,false);
 							PopUpManager.centerPopUp(myfloatdg);
 							//If you want the floating datagrid to constantly appear in the bottom left corner uncomment the next two lines
 							//myfloatdg.y = map.height + Number(ViewerContainer.getInstance().mapManager.top) - myfloatdg.height;
@@ -2781,19 +2895,19 @@
 						myfloatdg.zoomScale = zoomScale;
 						myfloatdg.ownerWidget = this;
 					}
-					
+
 				}
 				catch (error:Error)
 				{
 					showMessage(error.message, false);
 				}
 			}
-			
+
 			public function highlightDataGroupItem(gra:Graphic):void
 			{
 				var recAC:ArrayCollection = searchResultDG.dataProvider as ArrayCollection;
 				if(gra){
-					var sr:SearchResult = gra.attributes as SearchResult;						
+					var sr:SearchResult = gra.attributes as SearchResult;
 					for (var i:Number = 0; i < recAC.length; i++)
 					{
 						var sr1:SearchResult = searchResultAC[i];
@@ -2806,7 +2920,7 @@
 					}
 				}
 			}
-			
+
 			public function clearSelected():void
 			{
 				var recAC:ArrayCollection = searchResultDG.dataProvider as ArrayCollection;
@@ -2818,7 +2932,7 @@
 					}
 				}
 			}
-			
+
 			public function unhighlightDataGroupItems():void
 			{
 				var recAC:ArrayCollection = searchResultDG.dataProvider as ArrayCollection;
@@ -2831,26 +2945,26 @@
 					}
 				}
 			}
-			
+
 			private function showHighlight(params:Array):void
 			{
 				var showHighlightPoint:MapPoint = params[0].point as MapPoint;
-				
-				popUpRenderer.popUpInfo = configurePopUpInfo(params[0].graphic.attributes.link);
+
+				popUpRenderer.popUpInfo = configurePopUpInfo(params[0].graphic.attributes.link, params[0].graphic.attributes.linkalias);
 				popUpRenderer.graphic = params[0].graphic;
-				
+				popUpRenderer.setStyle("skinClass", widgets.eSearch.PopUpRendererSkin);
 				map.infoWindow.content = popUpRenderer;
 				map.infoWindow.contentOwner = popUpRenderer.graphic;
 				map.infoWindow.show(showHighlightPoint);
 			}
-			
-			private function configurePopUpInfo(link:String):PopUpInfo
+
+			private function configurePopUpInfo(link:String, linkalias:String=""):PopUpInfo
 			{
 				var popUpInfo:PopUpInfo = new PopUpInfo;
-				
+
 				popUpInfo.title = "{title}";
 				popUpInfo.description = "{content}";
-				
+
 				if (link)
 				{
 					var pos:Number = link.length - 4;
@@ -2865,25 +2979,29 @@
 					}
 					else
 					{
-						popUpInfo.description += "<br/><a href='{link}'>{link}</a>"
+						if(linkalias!=""){
+							popUpInfo.description += "<br/><a href='{link}'>" + linkalias + "</a>";
+						}else{
+							popUpInfo.description += "<br/><a href='{link}'>{link}</a>";
+						}
 					}
 				}
-				
+
 				return popUpInfo;
 			}
-			
+
 			private function showStateGraphicalSearch():void
 			{
 				lState = currentState;
 				currentState = "graphicalInput";
 			}
-			
+
 			private function showStateTextSearch():void
 			{
 				lState = currentState;
 				currentState = "textInput";
-			}				
-			
+			}
+
 			private function showStateResults():void
 			{
 				lState = currentState;
@@ -2902,41 +3020,41 @@
 					}
 				}
 			}
-			
+
 			private function showStateSpatialSearch():void
 			{
 				lState = currentState;
 				currentState = "spatialInput";
 			}
-			
+
 			private function widgetClosedHandler(event:Event):void
 			{
 				setMapAction(null, null, null, null);
 				graphicsLayer.visible = false;
 				hideInfoWindow();
 				setMapNavigation(null, null);
-				
+
 				if (selectedDrawingIcon)
 					selectedDrawingIcon = null;
 			}
-			
+
 			private function graphicsLayer_hideHandler(event:FlexEvent):void
 			{
 				hideInfoWindow();
 			}
-			
-			private function sldrDataTipFormatter(value:Number):String 
-			{ 
-				return int(value * 100) + "%"; 
+
+			private function sldrDataTipFormatter(value:Number):String
+			{
+				return int(value * 100) + "%";
 			}
-			
+
 			private function fnInit():void
 			{
 				cbSearch.addEventListener(ListEvent.ITEM_ROLL_OVER,fnCreToolTip);
 				cbSearch.addEventListener(ListEvent.ITEM_ROLL_OUT,fnCreToolTip);
 				cbSearch.addEventListener(ListEvent.CHANGE,fnCreToolTip);
 			}
-			
+
 			private function fnCreToolTip(e:ListEvent):void
 			{
 				switch(e.type)
@@ -2948,7 +3066,7 @@
 						}
 						catch(error:Error){}
 						//creates a tooltip.
-						myTip = ToolTipManager.createToolTip(cbSearch.dataProvider[e.rowIndex].label,stage.mouseX+10,stage.mouseY) as ToolTip; // array2 is id of arraylist  
+						myTip = ToolTipManager.createToolTip(cbSearch.dataProvider[e.rowIndex].label,stage.mouseX+10,stage.mouseY) as ToolTip; // array2 is id of arraylist
 						break;
 					}
 					case ListEvent.ITEM_ROLL_OUT:
@@ -2968,36 +3086,41 @@
 					}
 				}
 			}
-			
+
 			private function zoomAll():void
 			{
 				if(resultsFeatureSet){
-					var graphicsExtent:Extent = GraphicUtil.getGraphicsExtent(resultsFeatureSet.features);
-					map.extent = graphicsExtent.expand(1.2);
-					// make sure the whole extent is visible
-					if (!map.extent.contains(graphicsExtent.expand(1.2)))
-					{
-						map.level--;
+					if (resultsFeatureSet.features.length == 1
+						&& resultsFeatureSet.features[0].geometry.type == Geometry.MAPPOINT){
+						var mp:MapPoint = resultsFeatureSet.features[0].geometry as MapPoint;
+						map.zoom(1 / 16, mp);
+						map.centerAt(mp);
+					}else{
+						var graphicsExtent:Extent = GraphicUtil.getGraphicsExtent(resultsFeatureSet.features);
+						map.extent = graphicsExtent.expand(1.2);
+						// make sure the whole extent is visible
+						if (!map.extent.contains(graphicsExtent.expand(1.2)))
+							map.level--;
 					}
 				}
 			}
-			
+
 			private function geometryService_faultHandler(event:FaultEvent):void
 			{
 				Alert.show(event.fault.toString(), wTemplate.widgetTitle);
 			}
-			
+
 			private function iconRollOverHandler(event:MouseEvent):void
 			{
 				clearSelectionFilter();
 				event.target.filters = [ glowFilter ];
 			}
-			
+
 			private function iconRollOutHandler(event:MouseEvent):void
 			{
 				clearSelectionFilter();
 			}
-			
+
 			private function clearSelectionFilter():void
 			{
 				for (var i:int = 0; i < imageGroup.numChildren; i++)
@@ -3012,11 +3135,11 @@
 					}
 				}
 			}
-			
+
 			private function sharedDataUpdated(event:AppEvent):void
 			{
 				var data:Object = event.data;
-				
+
 				if (data.key == "Deactivate_DrawTool")
 				{
 					setMapAction(null, null, null, null);
@@ -3027,7 +3150,7 @@
 					}
 				}
 			}
-			
+
 			private function hideInfoWindow():void
 			{
 				if (map.infoWindow.contentOwner &&
@@ -3037,11 +3160,18 @@
 				}
 			}
 
+			private function DisplayVersion(evt:MouseEvent):void
+			{
+				if(evt.altKey){
+					Alert.show("Enhanched Search Widget Version: " + VERSION + "\nBuild Date: " + BUILDDATE,
+						wTemplate.widgetTitle,4,null,null,iconClass);
+				}
+			}
 		]]>
 	</fx:Script>
-	
+
 	<viewer:WidgetTemplate id="wTemplate"
-						   closed="widgetClosedHandler(event)" 
+						   closed="widgetClosedHandler(event)"
 						   open="widgetOpenedHandler(event)"
 						   width="400" height="240"
 						   minHeight="160"
@@ -3074,12 +3204,12 @@
 					 width="100%"
 					 text=""
 					 textAlign="center"/>
-			<s:TextInput id="txtSearch" width="90%" enter="queryFeaturesText()"/>
+			<s:TextInput id="txtSearch" width="90%"/>
 			<mx:ComboBox id="cbSearch" creationComplete="{cbSearch.width = wTemplate.width - 40; fnInit();}"
-						 change="queryFeaturesText()" visible="false" includeInLayout="false" 
+						 change="queryFeaturesText()" visible="false" includeInLayout="false"
 						 labelField="label"/>
 			<s:HGroup width="100%" horizontalAlign="center"  verticalAlign="middle">
-				<s:Button click="queryFeaturesText()" label="{submitLabel}"/>
+				<s:Button id="searchBtn" label="{submitLabel}"/>
 				<s:Button click="clear()" label="{clearLabel}"/>
 			</s:HGroup>
 		</s:Group>
@@ -3109,14 +3239,14 @@
 						  width="40" height="40"
 						  click="getDrawGra()"
 						  source= "widgets/eSearch/assets/images/i_draw_draw.png"
-						  toolTip="{drawGraLabel}" 
+						  toolTip="{drawGraLabel}"
 						  visible="{eDrawEnabled}"
 						  includeInLayout="{eDrawEnabled}" />
 				<mx:Image id="pBufferBtn"
 						  width="40" height="40"
 						  click="getBufferGra()"
 						  source= "widgets/eSearch/assets/images/i_draw_buffer.png"
-						  toolTip="{bufferGraLabel}" 
+						  toolTip="{bufferGraLabel}"
 						  visible="{pBufferEnabled}"
 						  includeInLayout="{pBufferEnabled}" />
 				<mx:Image id="iSearchPnt"
@@ -3204,7 +3334,7 @@
 						  source="assets/images/i_clear.png"
 						  toolTip="{clearLabel}"
 						  useHandCursor="true"/>
-			</s:HGroup>	
+			</s:HGroup>
 			<s:Line xFrom="0" xTo="350" yFrom="0" yTo="0">
 				<s:stroke>
 					<s:SolidColorStroke color="0xFFFFFF" weight="1"/>
@@ -3212,7 +3342,7 @@
 			</s:Line>
 			<s:Label id="lblSearchLayerSpatial" text="{searchLayerLabel}" width="100%"/>
 			<mx:ComboBox id="cboSearchLayerSpatial"/>
-			<s:HGroup id="SpatialOps" width="100%" gap="0" horizontalAlign="center" verticalAlign="middle" />		
+			<s:HGroup id="SpatialOps" width="100%" gap="0" horizontalAlign="center" verticalAlign="middle" />
 		</s:Group>
 		<!-- result-->
 		<s:Group id="resultsList"
